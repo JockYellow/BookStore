@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="bg-white shadow rounded-lg p-6">
+    <h1 class="text-2xl font-bold text-gray-800 mb-6">報表分析</h1>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white p-4 rounded shadow">
+            <h2 class="text-lg font-semibold mb-2">每日銷售額</h2>
+            <canvas id="dailySalesChart" class="h-64"></canvas>
+        </div>
+        <div class="bg-white p-4 rounded shadow">
+            <h2 class="text-lg font-semibold mb-2">分類銷售額</h2>
+            <canvas id="categorySalesChart" class="h-64"></canvas>
+        </div>
+    </div>
+
+    <div class="mt-6 bg-white p-4 rounded shadow">
+        <h2 class="text-lg font-semibold mb-2">熱銷商品</h2>
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead>
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">商品</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">銷售額</th>
+                </tr>
+            </thead>
+            <tbody id="topProductsBody" class="bg-white divide-y divide-gray-200">
+                <tr><td colspan="2" class="text-center py-4">載入中...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/reports.js"></script>
+{% endblock %}

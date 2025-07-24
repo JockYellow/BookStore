@@ -1,6 +1,8 @@
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
-from ..models import Purchase, PurchaseItem, Product
+# Absolute import ensures compatibility when executed outside of a package
+# context.
+from models import Purchase, PurchaseItem, Product
 from .base_service import BaseService
 from .product_service import ProductService
 
