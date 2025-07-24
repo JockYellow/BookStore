@@ -181,11 +181,11 @@ class UI {
 }
 
 // 初始化 UI 實例
-const ui = new UI();
-
+window.ui = new UI();
 // 導出 UI 實例
 if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {
     module.exports = ui;
 } else {
     window.UI = ui;
 }
+
