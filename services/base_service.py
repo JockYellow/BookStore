@@ -3,7 +3,13 @@ from datetime import datetime
 import json
 import os
 from pathlib import Path
-from ..models import COLLECTIONS
+"""Base service for CRUD operations backed by JSON files."""
+
+# Importing from the root-level ``models`` module using an absolute import.
+# Relative imports like ``from ..models`` fail when the application is
+# executed as a script because there is no package above ``services``. Using
+# absolute imports avoids this issue.
+from models import COLLECTIONS
 
 T = TypeVar('T')
 

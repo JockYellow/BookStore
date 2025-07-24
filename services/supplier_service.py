@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
-from ..models import Supplier, Purchase, Payment
+# Absolute import of models so relative imports don't break when running
+# ``main.py`` directly.
+from models import Supplier, Purchase, Payment
 from .base_service import BaseService
 from .purchase_service import PurchaseService
 
