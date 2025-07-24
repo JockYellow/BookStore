@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
-from ..models import Member, Sale
+# Use absolute imports for the models module.
+from models import Member, Sale
 from .base_service import BaseService
 from .sale_service import SaleService
 
