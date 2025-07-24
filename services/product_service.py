@@ -1,5 +1,6 @@
 from typing import List, Dict, Optional
-from ..models import Product
+# Use absolute imports so the module works when running the app directly.
+from models import Product
 from .base_service import BaseService
 
 class ProductService(BaseService):

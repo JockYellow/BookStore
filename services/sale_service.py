@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
-from ..models import Sale, SaleItem, Discount, Product
+# Absolute import prevents relative import errors when running main.py.
+from models import Sale, SaleItem, Discount, Product
 from .base_service import BaseService
 from .product_service import ProductService
 
