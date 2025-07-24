@@ -187,6 +187,57 @@ elif st.session_state.current_page == "商品管理":
         st.info("暫無商品數據")
 
 # 其他頁面的實現...
+elif st.session_state.current_page == "供應商管理":
+    st.title("📦 供應商管理")
+
+    suppliers = load_data("suppliers")
+    products = load_data("products")
+    sales_data = load_data("sales")
+    sales = sales_data.get("sales", sales_data if isinstance(sales_data, list) else [])
+
+    product_supplier = {p.get('id'): p.get('supplier_id') for p in products}
+    supplier_map = {s.get('id'): s.get('name') for s in suppliers}
+
+    col1, col2 = st.columns(2)
+    with col1:
+        start_date = st.date_input("開始日期", value=datetime.now() - timedelta(days=30))
+    with col2:
+        end_date = st.date_input("結束日期", value=datetime.now())
+
+    def parse_date(date_str: str):
+        try:
+            return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        except Exception:
+            return None
+
+    filtered_sales = []
+    for s in sales:
+        dt = parse_date(s.get('sale_date', ''))
+        if dt and start_date <= dt.date() <= end_date:
+            filtered_sales.append(s)
+
+    stats = {sid: {'name': supplier_map.get(sid, sid), 'quantity': 0, 'amount': 0.0} for sid in supplier_map}
+
+    for sale in filtered_sales:
+        for item in sale.get('items', []):
+            supplier_id = product_supplier.get(item.get('product_id'))
+            if not supplier_id:
+                continue
+            q = item.get('quantity', 0)
+            subtotal = item.get('subtotal')
+            if subtotal is None:
+                subtotal = item.get('unit_price', 0) * q - item.get('discount', 0)
+            stats[supplier_id]['quantity'] += q
+            stats[supplier_id]['amount'] += subtotal
+
+    df = pd.DataFrame([
+        {'供應商': v['name'], '銷售數量': v['quantity'], '銷售金額': v['amount']}
+        for v in stats.values()
+    ])
+
+    st.subheader("期間銷售彙總")
+    st.dataframe(df, use_container_width=True, hide_index=True,
+                 column_config={'銷售金額': st.column_config.NumberColumn(format="$%.2f")})
 else:
     st.title(st.session_state.current_page)
     st.write("開發中...")
