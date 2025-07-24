@@ -9,6 +9,7 @@ from typing import Dict, List, Optional, Any
 import json
 from datetime import datetime
 import os
+from services.report_service import ReportService
 import logging
 
 # 配置日誌
@@ -148,6 +149,15 @@ async def members_page(request: Request):
     return templates.TemplateResponse("members.html", {
         "request": request,
         "title": "會員管理"
+    })
+
+# 報表分析頁面
+@app.get("/reports", response_class=HTMLResponse)
+async def reports_page(request: Request):
+    """顯示簡易報表分析介面"""
+    return templates.TemplateResponse("reports.html", {
+        "request": request,
+        "title": "報表分析"
     })
 
 # 商品相關 API
@@ -617,8 +627,16 @@ async def delete_supplier(supplier_id: str):
     # 刪除供應商
     updated_suppliers = [s for s in suppliers if s["id"] != supplier_id]
     save_data("suppliers", updated_suppliers)
-    
+
     return {"message": "供應商已刪除", "id": supplier_id}
+
+# 報表相關 API
+@app.get("/api/reports/overview")
+async def get_report_overview(start_date: str = None, end_date: str = None):
+    """返回簡易銷售報表數據"""
+    service = ReportService(str(DATA_DIR))
+    report = service.get_sales_report(start_date, end_date)
+    return report
 
 
 # 啟動服務
