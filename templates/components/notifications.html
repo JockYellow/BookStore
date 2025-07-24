@@ -1,0 +1,35 @@
+<!-- 通知訊息 -->
+<div id="notifications" class="fixed top-4 right-4 z-50 space-y-2 w-80">
+    <!-- 成功通知 -->
+    <div id="success-notification" class="notification hidden bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+        <div class="flex items-center">
+            <i class="fas fa-check-circle mr-2"></i>
+            <span class="notification-message">操作成功！</span>
+        </div>
+        <button class="absolute top-0 bottom-0 right-0 px-4 py-3 close-notification">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    
+    <!-- 錯誤通知 -->
+    <div id="error-notification" class="notification hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+        <div class="flex items-center">
+            <i class="fas fa-exclamation-circle mr-2"></i>
+            <span class="notification-message">發生錯誤！</span>
+        </div>
+        <button class="absolute top-0 bottom-0 right-0 px-4 py-3 close-notification">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    
+    <!-- 警告通知 -->
+    <div id="warning-notification" class="notification hidden bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative" role="alert">
+        <div class="flex items-center">
+            <i class="fas fa-exclamation-triangle mr-2"></i>
+            <span class="notification-message">警告訊息</span>
+        </div>
+        <button class="absolute top-0 bottom-0 right-0 px-4 py-3 close-notification">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+</div>

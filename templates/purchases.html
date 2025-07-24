@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block title %}進貨管理 - 書房記帳系統{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <!-- 頁面標題與操作按鈕 -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+        <h1 class="text-2xl font-bold text-gray-800 mb-4 md:mb-0">進貨管理</h1>
+        <div class="flex space-x-2">
+            <button id="new-purchase-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                <i class="fas fa-plus mr-1"></i> 新增進貨
+            </button>
+            <button id="export-purchases-btn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                <i class="fas fa-file-export mr-1"></i> 匯出報表
+            </button>
+        </div>
+    </div>
+
+    <!-- 搜尋與篩選區域 -->
+    <div class="bg-white rounded-lg shadow p-4 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="md:col-span-2">
+                <label for="search" class="block text-sm font-medium text-gray-700 mb-1">搜尋</label>
+                <div class="relative">
+                    <input type="text" id="search" placeholder="搜尋商品名稱、供應商、單號..." 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                        <i class="fas fa-search text-gray-400"></i>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <label for="supplier-filter" class="block text-sm font-medium text-gray-700 mb-1">供應商</label>
+                <select id="supplier-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">全部供應商</option>
+                    <!-- 動態載入供應商選項 -->
+                </select>
+            </div>
+            <div>
+                <label for="date-range" class="block text-sm font-medium text-gray-700 mb-1">日期範圍</label>
+                <div class="relative">
+                    <input type="text" id="date-range" placeholder="選擇日期範圍" 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 cursor-pointer">
+                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                        <i class="far fa-calendar-alt text-gray-400"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 進貨清單 -->
+    <div class="bg-white shadow rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">進貨單號</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">供應商</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">商品數量</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">總金額</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">進貨日期</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">狀態</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="purchases-list" class="bg-white divide-y divide-gray-200">
+                    <!-- 動態載入進貨記錄 -->
+                    <tr>
+                        <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500">載入中...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 分頁控制 -->
+        <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+            <div class="flex-1 flex justify-between sm:hidden">
+                <button id="mobile-prev-page" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">上一頁</button>
+                <button id="mobile-next-page" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">下一頁</button>
+            </div>
+            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                <div>
+                    <p class="text-sm text-gray-700">
+                        顯示 <span id="start-item" class="font-medium">0</span> 到 <span id="end-item" class="font-medium">0</span> 筆，共 <span id="total-items" class="font-medium">0</span> 筆
+                    </p>
+                </div>
+                <div>
+                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                        <button id="prev-page" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            <span class="sr-only">上一頁</span>
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <div id="pagination-numbers" class="flex">
+                            <!-- 分頁數字按鈕將在這裡動態生成 -->
+                        </div>
+                        <button id="next-page" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            <span class="sr-only">下一頁</span>
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 進貨明細 Modal -->
+<div id="purchase-detail-modal" class="fixed inset-0 overflow-y-auto hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">進貨明細</h3>
+                            <button type="button" class="close-modal-btn text-gray-400 hover:text-gray-500">
+                                <i class="fas fa-times text-xl"></i>
+                            </button>
+                        </div>
+                        <div class="mt-2">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <p class="text-sm text-gray-500">進貨單號</p>
+                                    <p id="purchase-id" class="font-medium">-</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-500">供應商</p>
+                                    <p id="supplier-name" class="font-medium">-</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-500">進貨日期</p>
+                                    <p id="purchase-date" class="font-medium">-</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-500">狀態</p>
+                                    <p id="purchase-status" class="font-medium">-</p>
+                                </div>
+                                <div class="md:col-span-2">
+                                    <p class="text-sm text-gray-500">備註</p>
+                                    <p id="purchase-notes" class="font-medium">-</p>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-4">
+                                <h4 class="text-md font-medium text-gray-900 mb-2">商品明細</h4>
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full divide-y divide-gray-200">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">商品編號</th>
+                                                <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">商品名稱</th>
+                                                <th scope="col" class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">單價</th>
+                                                <th scope="col" class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">數量</th>
+                                                <th scope="col" class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">小計</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="purchase-items" class="bg-white divide-y divide-gray-200">
+                                            <!-- 動態載入進貨商品明細 -->
+                                        </tbody>
+                                        <tfoot>
+                                            <tr class="border-t border-gray-200">
+                                                <td colspan="4" class="px-3 py-2 text-right text-sm font-medium text-gray-700">商品總計</td>
+                                                <td id="purchase-subtotal" class="px-3 py-2 text-right text-sm font-medium">$0</td>
+                                            </tr>
+                                            <tr>
+                                                <td colspan="4" class="px-3 py-2 text-right text-sm font-medium text-gray-700">運費</td>
+                                                <td id="purchase-shipping" class="px-3 py-2 text-right text-sm font-medium">$0</td>
+                                            </tr>
+                                            <tr class="border-t border-gray-200">
+                                                <td colspan="4" class="px-3 py-2 text-right text-sm font-bold text-gray-900">總計</td>
+                                                <td id="purchase-total" class="px-3 py-2 text-right text-sm font-bold text-gray-900">$0</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="button" class="close-modal-btn w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                    關閉
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='js/purchases.js') }}"></script>
+{% endblock %}

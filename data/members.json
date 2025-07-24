@@ -1,0 +1,49 @@
+{
+  "members": [
+    {
+      "id": "M001",
+      "name": "王小明",
+      "phone": "0912345678",
+      "email": "ming@example.com",
+      "address": "台北市大安區復興南路一段100號",
+      "birthday": "1990-05-15",
+      "join_date": "2025-01-10T10:00:00Z",
+      "total_purchases": 5,
+      "total_spent": 3500,
+      "last_visit": "2025-07-20T10:15:00Z",
+      "notes": "常購買靈修類書籍",
+      "created_at": "2025-01-10T10:00:00Z",
+      "updated_at": "2025-07-20T10:15:00Z"
+    },
+    {
+      "id": "M002",
+      "name": "林小華",
+      "phone": "0922333444",
+      "email": "hua@example.com",
+      "address": "新北市板橋區文化路一段200號",
+      "birthday": "1985-10-20",
+      "join_date": "2025-02-15T14:30:00Z",
+      "total_purchases": 3,
+      "total_spent": 2800,
+      "last_visit": "2025-07-18T16:45:00Z",
+      "notes": "偏好神學類書籍",
+      "created_at": "2025-02-15T14:30:00Z",
+      "updated_at": "2025-07-18T16:45:00Z"
+    },
+    {
+      "id": "M003",
+      "name": "陳小美",
+      "phone": "0933555777",
+      "email": "mei@example.com",
+      "address": "台北市信義區信義路五段50號",
+      "birthday": "1995-03-25",
+      "join_date": "2025-03-05T11:20:00Z",
+      "total_purchases": 2,
+      "total_spent": 1500,
+      "last_visit": "2025-07-10T13:15:00Z",
+      "notes": "新會員，購買兒童聖經",
+      "created_at": "2025-03-05T11:20:00Z",
+      "updated_at": "2025-07-10T13:15:00Z"
+    }
+  ]
+}

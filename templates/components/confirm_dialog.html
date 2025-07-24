@@ -1,0 +1,24 @@
+<!-- 確認對話框 -->
+<div id="confirm-dialog" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg shadow-xl w-96">
+        <!-- Header -->
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-medium text-gray-900" id="confirm-title">確認操作</h3>
+        </div>
+        
+        <!-- Body -->
+        <div class="px-6 py-4">
+            <p class="text-gray-600" id="confirm-message">您確定要執行此操作嗎？此操作無法復原。</p>
+        </div>
+        
+        <!-- Footer -->
+        <div class="px-6 py-4 bg-gray-50 text-right rounded-b-lg">
+            <button type="button" id="confirm-cancel" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                取消
+            </button>
+            <button type="button" id="confirm-ok" class="ml-3 inline-flex justify-center px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                確認
+            </button>
+        </div>
+    </div>
+</div>

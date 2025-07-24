@@ -1,0 +1,136 @@
+[
+  {
+    "id": "1",
+    "purchase_number": "PO-20250724-0001",
+    "supplier_id": "S001",
+    "purchase_date": "2025-07-24T10:00:00+08:00",
+    "expected_delivery_date": "2025-07-31T23:59:59+08:00",
+    "status": "received",
+    "shipping_fee": 150,
+    "tax_rate": 5,
+    "notes": "一般圖書進貨",
+    "items": [
+      {
+        "product_id": "P001",
+        "quantity": 20,
+        "unit_price": 350,
+        "product_name": "原子習慣"
+      },
+      {
+        "product_id": "P002",
+        "quantity": 15,
+        "unit_price": 280,
+        "product_name": "被討厭的勇氣"
+      }
+    ],
+    "total": 11250,
+    "created_at": "2025-07-24T10:00:00+08:00",
+    "updated_at": "2025-07-24T10:00:00+08:00"
+  },
+  {
+    "id": "2",
+    "purchase_number": "PO-20250724-0002",
+    "supplier_id": "S002",
+    "purchase_date": "2025-07-24T14:30:00+08:00",
+    "expected_delivery_date": "2025-07-28T23:59:59+08:00",
+    "status": "ordered",
+    "shipping_fee": 100,
+    "tax_rate": 5,
+    "notes": "文具用品進貨",
+    "items": [
+      {
+        "product_id": "P101",
+        "quantity": 50,
+        "unit_price": 25,
+        "product_name": "筆記本"
+      },
+      {
+        "product_id": "P102",
+        "quantity": 100,
+        "unit_price": 15,
+        "product_name": "原子筆"
+      }
+    ],
+    "total": 2875,
+    "created_at": "2025-07-24T14:30:00+08:00",
+    "updated_at": "2025-07-24T14:30:00+08:00"
+  },
+  {
+    "id": "3",
+    "purchase_number": "PO-20250723-0001",
+    "supplier_id": "S003",
+    "purchase_date": "2025-07-23T09:15:00+08:00",
+    "expected_delivery_date": "2025-07-30T23:59:59+08:00",
+    "status": "draft",
+    "shipping_fee": 0,
+    "tax_rate": 0,
+    "notes": "草稿訂單",
+    "items": [
+      {
+        "product_id": "P201",
+        "quantity": 10,
+        "unit_price": 1200,
+        "product_name": "高級鋼筆"
+      }
+    ],
+    "total": 12000,
+    "created_at": "2025-07-23T09:15:00+08:00",
+    "updated_at": "2025-07-23T09:15:00+08:00"
+  },
+  {
+    "id": "4",
+    "purchase_number": "PO-20250722-0001",
+    "supplier_id": "S004",
+    "purchase_date": "2025-07-22T11:20:00+08:00",
+    "expected_delivery_date": "2025-07-29T23:59:59+08:00",
+    "status": "cancelled",
+    "shipping_fee": 200,
+    "tax_rate": 5,
+    "notes": "供應商缺貨取消",
+    "items": [
+      {
+        "product_id": "P301",
+        "quantity": 5,
+        "unit_price": 2500,
+        "product_name": "高級書架"
+      }
+    ],
+    "total": 12750,
+    "created_at": "2025-07-22T11:20:00+08:00",
+    "updated_at": "2025-07-22T16:45:00+08:00"
+  },
+  {
+    "id": "5",
+    "purchase_number": "PO-20250721-0001",
+    "supplier_id": "S005",
+    "purchase_date": "2025-07-21T15:10:00+08:00",
+    "expected_delivery_date": "2025-07-25T23:59:59+08:00",
+    "status": "received",
+    "shipping_fee": 180,
+    "tax_rate": 5,
+    "notes": "促銷活動用書",
+    "items": [
+      {
+        "product_id": "P401",
+        "quantity": 30,
+        "unit_price": 180,
+        "product_name": "暢銷小說"
+      },
+      {
+        "product_id": "P402",
+        "quantity": 20,
+        "unit_price": 220,
+        "product_name": "商業理財書"
+      },
+      {
+        "product_id": "P403",
+        "quantity": 15,
+        "unit_price": 150,
+        "product_name": "兒童繪本"
+      }
+    ],
+    "total": 11550,
+    "created_at": "2025-07-21T15:10:00+08:00",
+    "updated_at": "2025-07-22T10:30:00+08:00"
+  }
+]

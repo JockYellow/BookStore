@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="bg-white shadow rounded-lg p-6">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold text-gray-800">商品管理</h1>
+        <button id="addProductBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center">
+            <i class="fas fa-plus mr-2"></i> 新增商品
+        </button>
+    </div>
+    
+    <!-- 搜尋與篩選 -->
+    <div class="mb-6 bg-gray-50 p-4 rounded-lg">
+        <div class="flex flex-col md:flex-row md:items-center md:space-x-4 space-y-4 md:space-y-0">
+            <div class="flex-1">
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fas fa-search text-gray-400"></i>
+                    </div>
+                    <input type="text" id="searchInput" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="搜尋商品...">
+                </div>
+            </div>
+            <div class="flex space-x-2">
+                <select id="categoryFilter" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                    <option value="">所有類別</option>
+                    <option>書籍</option>
+                    <option>文具</option>
+                    <option>禮品</option>
+                </select>
+                <select id="statusFilter" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                    <option value="">所有狀態</option>
+                    <option value="in_stock">有庫存</option>
+                    <option value="low_stock">低庫存</option>
+                    <option value="out_of_stock">無庫存</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 商品表格 -->
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">商品名稱</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">條碼</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">類別</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">成本價</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">售價</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">庫存</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">狀態</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                </tr>
+            </thead>
+            <tbody id="productsTableBody" class="bg-white divide-y divide-gray-200">
+                <!-- 商品數據將通過 JavaScript 動態加載 -->
+                <tr>
+                    <td colspan="8" class="px-6 py-4 text-center text-gray-500">
+                        載入中...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- 分頁 -->
+    <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+        <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+            <div>
+                <p class="text-sm text-gray-700">
+                    顯示 <span class="font-medium" id="startItem">1</span> 到 
+                    <span class="font-medium" id="endItem">10</span> 筆，共 
+                    <span class="font-medium" id="totalItems">0</span> 筆結果
+                </p>
+            </div>
+            <div>
+                <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                    <a href="#" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                        <span class="sr-only">上一頁</span>
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                    <a href="#" aria-current="page" class="z-10 bg-blue-50 border-blue-500 text-blue-600 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
+                        1
+                    </a>
+                    <a href="#" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
+                        2
+                    </a>
+                    <a href="#" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 hidden md:inline-flex relative items-center px-4 py-2 border text-sm font-medium">
+                        3
+                    </a>
+                    <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                        ...
+                    </span>
+                    <a href="#" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 hidden md:inline-flex relative items-center px-4 py-2 border text-sm font-medium">
+                        8
+                    </a>
+                    <a href="#" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                        <span class="sr-only">下一頁</span>
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 新增/編輯商品模態框 -->
+<div id="productModal" class="fixed z-10 inset-0 overflow-y-auto hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="modalTitle">新增商品</h3>
+                        <div class="mt-5">
+                            <form id="productForm">
+                                <input type="hidden" id="productId">
+                                <div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+                                    <div class="sm:col-span-4">
+                                        <label for="productName" class="block text-sm font-medium text-gray-700">商品名稱</label>
+                                        <div class="mt-1">
+                                            <input type="text" name="productName" id="productName" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" required>
+                                        </div>
+                                    </div>
+                                    <div class="sm:col-span-2">
+                                        <label for="barcode" class="block text-sm font-medium text-gray-700">條碼</label>
+                                        <div class="mt-1 flex rounded-md shadow-sm">
+                                            <input type="text" name="barcode" id="barcode" class="focus:ring-blue-500 focus:border-blue-500 flex-1 block w-full rounded-md sm:text-sm border-gray-300">
+                                            <button type="button" class="ml-3 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                                <i class="fas fa-barcode mr-1"></i> 掃描
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="sm:col-span-3">
+                                        <label for="category" class="block text-sm font-medium text-gray-700">類別</label>
+                                        <div class="mt-1">
+                                            <select id="category" name="category" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                                                <option value="">選擇類別</option>
+                                                <option>書籍</option>
+                                                <option>文具</option>
+                                                <option>禮品</option>
+                                                <option>其他</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="sm:col-span-3">
+                                        <label for="supplier" class="block text-sm font-medium text-gray-700">供應商</label>
+                                        <div class="mt-1">
+                                            <select id="supplier" name="supplier" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                                                <option value="">選擇供應商</option>
+                                                <!-- 供應商選項將動態加載 -->
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="sm:col-span-2">
+                                        <label for="costPrice" class="block text-sm font-medium text-gray-700">成本價</label>
+                                        <div class="mt-1 relative rounded-md shadow-sm">
+                                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <span class="text-gray-500 sm:text-sm">$</span>
+                                            </div>
+                                            <input type="number" step="0.01" name="costPrice" id="costPrice" class="focus:ring-blue-500 focus:border-blue-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md" placeholder="0.00">
+                                        </div>
+                                    </div>
+                                    <div class="sm:col-span-2">
+                                        <label for="salePrice" class="block text-sm font-medium text-gray-700">售價</label>
+                                        <div class="mt-1 relative rounded-md shadow-sm">
+                                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <span class="text-gray-500 sm:text-sm">$</span>
+                                            </div>
+                                            <input type="number" step="0.01" name="salePrice" id="salePrice" class="focus:ring-blue-500 focus:border-blue-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md" placeholder="0.00" required>
+                                        </div>
+                                    </div>
+                                    <div class="sm:col-span-2">
+                                        <label for="stock" class="block text-sm font-medium text-gray-700">庫存數量</label>
+                                        <div class="mt-1">
+                                            <input type="number" name="stock" id="stock" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" value="0">
+                                        </div>
+                                    </div>
+                                    <div class="sm:col-span-3">
+                                        <label for="minStock" class="block text-sm font-medium text-gray-700">最低庫存警告</label>
+                                        <div class="mt-1">
+                                            <input type="number" name="minStock" id="minStock" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" value="5">
+                                        </div>
+                                    </div>
+                                    <div class="sm:col-span-3">
+                                        <label for="unit" class="block text-sm font-medium text-gray-700">單位</label>
+                                        <div class="mt-1">
+                                            <input type="text" name="unit" id="unit" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="個/本/支">
+                                        </div>
+                                    </div>
+                                    <div class="sm:col-span-6">
+                                        <label for="description" class="block text-sm font-medium text-gray-700">商品描述</label>
+                                        <div class="mt-1">
+                                            <textarea id="description" name="description" rows="3" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"></textarea>
+                                        </div>
+                                    </div>
+                                    <div class="sm:col-span-6">
+                                        <label class="block text-sm font-medium text-gray-700">商品圖片</label>
+                                        <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+                                            <div class="space-y-1 text-center">
+                                                <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                                                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                                </svg>
+                                                <div class="flex text-sm text-gray-600">
+                                                    <label for="productImage" class="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
+                                                        <span>上傳圖片</span>
+                                                        <input id="productImage" name="productImage" type="file" class="sr-only">
+                                                    </label>
+                                                    <p class="pl-1">或拖放檔案到這裡</p>
+                                                </div>
+                                                <p class="text-xs text-gray-500">PNG, JPG, GIF 最大 10MB</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="button" id="saveProductBtn" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">儲存</button>
+                <button type="button" id="cancelProductBtn" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">取消</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script src="/static/js/products.js"></script>
+{% endblock %}
+
+{% endblock %}
