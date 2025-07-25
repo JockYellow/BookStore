@@ -107,7 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // 處理表單提交
-    const handleFormSubmit = async () => {
+    const handleFormSubmit = () => {
         const productId = document.getElementById('productId').value;
         const isEdit = !!productId;
         

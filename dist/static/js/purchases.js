@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!response.ok) throw new Error('無法載入進貨紀錄');
         const result = await response.json();
         // API 回傳的資料結構是 { "data": [...] }
-        allPurchases = result.data || []; 
+        allPurchases = result || []; 
     };
 
     // 渲染進貨列表
@@ -136,7 +136,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         window.app.ui.showLoading('刪除中...');
         try {
-            const response = await fetch('./data/purchases.json', { method: 'DELETE' });
+            const response = await fetch(`/api/purchases/${purchaseId}`, { method: 'DELETE' });
             if (!response.ok) {
                 const err = await response.json();
                 throw new Error(err.detail || '刪除失敗');

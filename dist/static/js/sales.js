@@ -120,7 +120,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         window.app.ui.showLoading('結帳中...');
         try {
-            const response = await fetch('./data/sales.json', {
+            const response = await fetch('/api/sales', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(saleData)

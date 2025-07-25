@@ -44,89 +44,18 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 載入供應商資料
     const loadSuppliers = async () => {
-        window.app.ui.showLoading('載入供應商資料中...');
-        try {
-            const response = await fetch('./data/suppliers.json');
-            if (!response.ok) throw new Error('無法載入供應商資料');
-            allSuppliers = await response.json();
-            renderSuppliers(allSuppliers);
-        } catch (error) {
-            console.error('載入供應商資料失敗:', error);
-            window.app.ui.showNotification('error', '載入供應商資料失敗');
-        } finally {
-            window.app.ui.hideLoading();
-        }
-    };
-
-    // 渲染列表
-    const renderSuppliers = (suppliers) => {
-        if (!suppliersList) return;
-        if (suppliers.length === 0) {
-            suppliersList.innerHTML = `<tr><td colspan="6" class="text-center py-4">沒有供應商資料</td></tr>`;
-            return;
-        }
-
-        suppliersList.innerHTML = suppliers.map(supplier => `
-            <tr data-id="${supplier.id}">
-                <td class="px-6 py-4 whitespace-nowrap">${supplier.name}</td>
-                <td class="px-6 py-4 whitespace-nowrap">${supplier.contact_person}</td>
-                <td class="px-6 py-4 whitespace-nowrap">${supplier.phone}</td>
-                <td class="px-6 py-4 whitespace-nowrap">${supplier.payment_terms}</td>
-                <td class="px-6 py-4 whitespace-nowrap">${new Date(supplier.created_at).toLocaleDateString()}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button class="text-blue-600 hover:text-blue-900 edit-supplier"><i class="fas fa-edit"></i> 編輯</button>
-                    <button class="text-red-600 hover:text-red-900 ml-4 delete-supplier"><i class="fas fa-trash"></i> 刪除</button>
-                </td>
-            </tr>
-        `).join('');
-    };
-
-    // 處理表單提交
-    const handleSubmitSupplier = async (e) => {
-        e.preventDefault();
-        const supplierId = supplierForm.dataset.id;
-        const isEdit = !!supplierId;
         
-        const formData = new FormData(supplierForm);
-        const supplierData = {
-            name: formData.get('name').trim(),
-            contact_person: formData.get('contact_person').trim(),
-            phone: formData.get('phone').trim(),
-            email: formData.get('email').trim(),
-            address: formData.get('address').trim(),
-            payment_terms: formData.get('payment_terms'),
-            notes: formData.get('notes').trim(),
-        };
-
-        if (!supplierData.name || !supplierData.contact_person || !supplierData.phone) {
-            window.app.ui.showNotification('error', '請填寫所有必填欄位 (*)');
-            return;
+        if (isEdit) {
+            const index = allSuppliers.findIndex(s => s.id === supplierId);
+            if (index !== -1) allSuppliers[index] = { ...allSuppliers[index], ...supplierData, id: supplierId };
+        } else {
+            supplierData.id = `S_NEW_${Date.now()}`;
+            allSuppliers.push(supplierData);
         }
-
-        const url = isEdit ? './data/suppliers.json' : './data/suppliers.json';
-        const method = isEdit ? 'PUT' : 'POST';
-
-        window.app.ui.showLoading('儲存中...');
-        try {
-            const response = await fetch(url, {
-                method: method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(supplierData)
-            });
-
-            if (!response.ok) {
-                const err = await response.json();
-                throw new Error(err.detail || '儲存失敗');
-            }
-
-            window.app.ui.showNotification('success', '供應商資料儲存成功！');
-            closeSupplierModal();
-            loadSuppliers();
-        } catch (error) {
-            console.error('儲存供應商失敗:', error);
-            window.app.ui.showNotification('error', error.message);
-        } finally {
-            window.app.ui.hideLoading();
+        window.app.ui.showNotification('success', '供應商資料儲存成功！');
+        closeSupplierModal();
+        renderSuppliers(allSuppliers);
+        
         }
     };
     
@@ -160,7 +89,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const deleteSupplier = async (supplierId) => {
         window.app.ui.showLoading('刪除中...');
         try {
-            const response = await fetch('./data/suppliers.json', { method: 'DELETE' });
+            const response = await fetch(`/api/suppliers/${supplierId}`, { method: 'DELETE' });
             if (!response.ok) {
                 const err = await response.json();
                 throw new Error(err.detail || '刪除失敗');
