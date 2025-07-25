@@ -86,10 +86,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const viewPurchaseDetails = async (purchaseId) => {
         window.app.ui.showLoading('載入明細中...');
         try {
-            const response = await fetch('./data/purchases.json');
+            const response = await fetch(`./data/purchases.json/${purchaseId}`);
             if (!response.ok) throw new Error('無法獲取明細');
             const result = await response.json();
-            const purchase = result.data;
+            const purchase = result;
             
             const supplier = allSuppliers.find(s => s.id === purchase.supplier_id);
             
@@ -130,13 +130,13 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     
     // 刪除進貨單
-    const deletePurchase = async (purchaseId) => {
+    const deletePurchase = (purchaseId) => {
         const confirmed = await window.app.ui.showConfirmDialog({ title: '確認刪除', message: '您確定要刪除這筆進貨單嗎？' });
         if (!confirmed) return;
 
         window.app.ui.showLoading('刪除中...');
         try {
-            const response = await fetch(`/api/purchases/${purchaseId}`, { method: 'DELETE' });
+            const response = await fetch(`./data/purchases.json/${purchaseId}`, { method: 'DELETE' });
             if (!response.ok) {
                 const err = await response.json();
                 throw new Error(err.detail || '刪除失敗');

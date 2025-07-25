@@ -102,25 +102,23 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     // 處理結帳流程
-    const processCheckout = async () => {
-        const total = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
-        
-        const saleData = {
-            items: cart.map(item => ({
-                product_id: item.id,
-                quantity: item.quantity,
-                unit_price: item.price
-            })),
-            total: total,
-            subtotal: total,
-            payment_method: 'cash', // 可擴充
-            amount_received: total, // 假設付清
-            change: 0
-        };
+    
+    const processCheckout = () => {
+        window.app.ui.showLoading('結帳中...');
+        setTimeout(() => {
+            window.app.ui.hideLoading();
+            window.app.ui.showNotification('success', '結帳成功！');
+            cart = [];
+            updateCartUI();
+            checkoutModal.classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+        }, 800);
+    };
+            
 
         window.app.ui.showLoading('結帳中...');
         try {
-            const response = await fetch('/api/sales', {
+            const response = await fetch('./data/sales.json', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(saleData)

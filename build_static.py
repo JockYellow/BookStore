@@ -31,7 +31,7 @@ def setup_dist_directory():
 
 def process_and_copy_assets():
     """
-    複製靜態資源並對 JavaScript 檔案進行全面改造，以適應靜態網站。
+    複製靜態資源並對 JavaScript 檔案進行全面改造，以適應靜態網站的互動模擬。
     """
     print("2. 正在處理與複製靜態資源...")
     dist_static_dir = DIST_DIR / "static"
@@ -42,92 +42,125 @@ def process_and_copy_assets():
         print("   ⚠️ 未找到 JavaScript 目錄，跳過處理。")
         return
 
-    # --- 定義 JS 修改規則 ---
-
-    # 規則 1: API 路徑替換
-    api_replacements = [
-        (r"'/api/(\w+)/overview'", r"'./data/reports.json'"), # reports.js 特殊路徑
-        (r"fetch\('/api/(\w+)'\)", r"fetch('./data/\1.json')"),
-        (r'fetch\("/api/(\w+)"\)', r'fetch("./data/\1.json")'),
-        (r"fetch\(`/api/(\w+)/\${.+?}`\)", r"fetch('./data/\1.json')"),
-    ]
-    
-    # 規則 2: 模擬 Fetch 請求的替換 (正則表達式)
-    # 匹配一個完整的 fetch().then().catch().finally() 結構
-    fetch_pattern = re.compile(
-        r"window\.app\.ui\.showLoading\((?:.|\n)*?fetch\((?:.|\n)*?body: JSON\.stringify\((?P<data_var>\w+)\)(?:.|\n)*?\}\);(?P<block_content>(?:.|\n)*?)\s*?window\.app\.ui\.hideLoading\(\);",
-        re.MULTILINE
-    )
-
-    # 檔案特定的模擬程式碼
-    simulation_logic = {
-        "members.js": """
-        if (isEdit) {
-            const index = allMembers.findIndex(m => m.id === memberId);
-            if (index !== -1) allMembers[index] = { ...allMembers[index], ...memberData, id: memberId };
-        } else {
-            memberData.id = `M_NEW_${Date.now()}`;
-            allMembers.push(memberData);
-        }
-        window.app.ui.showNotification('success', '會員資料儲存成功！');
-        closeMemberModal();
-        loadMembers(); // 直接重新渲染而不是從檔案載入
-        renderMembers(allMembers);
-        """,
-        "suppliers.js": """
-        if (isEdit) {
-            const index = allSuppliers.findIndex(s => s.id === supplierId);
-            if (index !== -1) allSuppliers[index] = { ...allSuppliers[index], ...supplierData, id: supplierId };
-        } else {
-            supplierData.id = `S_NEW_${Date.now()}`;
-            allSuppliers.push(supplierData);
-        }
-        window.app.ui.showNotification('success', '供應商資料儲存成功！');
-        closeSupplierModal();
-        renderSuppliers(allSuppliers);
-        """,
-        "products.js": """
-        if (isEdit) {
-            const index = allProducts.findIndex(p => p.id === productId);
-            if (index !== -1) allProducts[index] = { ...allProducts[index], ...productData, id: productId };
-        } else {
-            productData.id = `P_NEW_${Date.now()}`;
-            allProducts.push(productData);
-        }
-        window.app.ui.showNotification('success', '商品資料儲存成功！');
-        closeModal();
-        renderTable(allProducts);
-        """,
-         "purchase_form.js": """
-        window.app.ui.showNotification('success', '進貨單已成功建立！');
-        setTimeout(() => { window.location.href = './purchases.html'; }, 1500);
-        """
-    }
-
     print("   正在全面改造 JavaScript 檔案以適應靜態模式...")
     for js_file in js_dir.glob("*.js"):
         content = js_file.read_text("utf-8")
         
-        # 步驟 1: 替換 API 路徑
-        for pattern, replacement in api_replacements:
-            content = re.sub(pattern, replacement, content)
+        # --- 步驟 1: API 路徑替換 (用於初始資料載入) ---
+        content = re.sub(r"/api/(\w+)/overview", r"./data/reports.json", content)
+        content = re.sub(r"/api/(\w+)", r"./data/\1.json", content)
 
-        # 步驟 2: 替換 fetch 提交邏輯為前端模擬
-        if js_file.name in simulation_logic:
-            # 找到異步函數定義，並移除 async 關鍵字
-            content = re.sub(r'const handle.*? = async \(.*?\)', lambda m: m.group(0).replace('async ', ''), content)
-            
-            # 替換 fetch 區塊
-            match = fetch_pattern.search(content)
-            if match:
-                replacement_code = simulation_logic[js_file.name]
-                content = fetch_pattern.sub(replacement_code, content)
-                print(f"   - 已模擬 {js_file.name} 的表單提交功能。")
-        
-        # 步驟 3: 修正 purchases.js 的資料讀取問題
+        # --- 步驟 2: 修正 purchases.js 的資料讀取問題 ---
         if js_file.name == 'purchases.js':
-            content = content.replace('allPurchases = result.data || [];', 'allPurchases = result || [];')
+            content = content.replace('result.data', 'result')
             print(f"   - 已修正 {js_file.name} 的資料讀取邏輯。")
+
+        # --- 步驟 3: 注入前端互動模擬程式碼 ---
+        
+        # 移除異步關鍵字 `async`，因為不再有實際的 await
+        content = re.sub(r'const handle.*? = async \(.*?\)', lambda m: m.group(0).replace('async ', ''), content)
+        content = re.sub(r'const processCheckout = async \(\)', 'const processCheckout = ()', content)
+        content = re.sub(r'const delete.*? = async \(.*?\)', lambda m: m.group(0).replace('async ', ''), content)
+
+        # 模擬 suppliers.js 的新增/編輯
+        if js_file.name == 'suppliers.js':
+            submit_pattern = re.compile(r"const handleSubmitSupplier = \((?:.|\n)*?\{((?:.|\n)*?)\};", re.MULTILINE)
+            delete_pattern = re.compile(r"const deleteSupplier = \((?:.|\n)*?\{((?:.|\n)*?)\};", re.MULTILINE)
+            
+            content = submit_pattern.sub(r"""
+    const handleSubmitSupplier = (e) => {
+        e.preventDefault();
+        const supplierId = supplierForm.dataset.id;
+        const isEdit = !!supplierId;
+        const supplierData = {
+            id: supplierId || `S_NEW_${Date.now()}`,
+            name: document.getElementById('supplier-name').value.trim(),
+            contact_person: document.getElementById('contact-person').value.trim(),
+            phone: document.getElementById('phone').value.trim(),
+            payment_terms: document.getElementById('payment-terms').value,
+            created_at: new Date().toISOString()
+        };
+        if (!supplierData.name || !supplierData.contact_person || !supplierData.phone) {
+            window.app.ui.showNotification('error', '請填寫所有必填欄位 (*)');
+            return;
+        }
+        if (isEdit) {
+            const index = allSuppliers.findIndex(s => s.id === supplierId);
+            if (index !== -1) allSuppliers[index] = { ...allSuppliers[index], ...supplierData };
+        } else {
+            allSuppliers.unshift(supplierData);
+        }
+        renderSuppliers(allSuppliers);
+        closeSupplierModal();
+        window.app.ui.showNotification('success', '供應商資料已成功模擬儲存！');
+    };
+            """, content)
+            
+            content = delete_pattern.sub(r"""
+    const deleteSupplier = (supplierId) => {
+        allSuppliers = allSuppliers.filter(s => s.id !== supplierId);
+        renderSuppliers(allSuppliers);
+        window.app.ui.showNotification('success', '供應商已模擬刪除');
+    };
+            """, content)
+            print(f"   - 已注入 {js_file.name} 的互動模擬功能。")
+
+        # 模擬 members.js 的新增/編輯
+        if js_file.name == 'members.js':
+            content = re.sub(r"const handleFormSubmit = async \((?:.|\n)*?\{((?:.|\n)*?)\};", r"""
+    const handleFormSubmit = (e) => {
+        e.preventDefault();
+        const memberId = document.getElementById('member-id').value;
+        const isEdit = !!memberId;
+        const memberData = {
+            id: memberId || `M_NEW_${Date.now()}`,
+            name: document.getElementById('name').value.trim(),
+            phone: document.getElementById('phone').value.trim(),
+            email: document.getElementById('email').value.trim(),
+            total_spent: isEdit ? (allMembers.find(m => m.id === memberId).total_spent || 0) : 0,
+            member_level: document.getElementById('member-level').value,
+            status: document.getElementById('status').value
+        };
+        if (!memberData.name || !memberData.phone) {
+            window.app.ui.showNotification('error', '請填寫姓名與電話');
+            return;
+        }
+        if (isEdit) {
+            const index = allMembers.findIndex(m => m.id === memberId);
+            if (index !== -1) allMembers[index] = { ...allMembers[index], ...memberData };
+        } else {
+            allMembers.unshift(memberData);
+        }
+        renderMembers(allMembers);
+        closeMemberModal();
+        window.app.ui.showNotification('success', '會員資料已成功模擬儲存！');
+    };
+            """, content, flags=re.MULTILINE)
+            content = re.sub(r"const deleteMember = async \((?:.|\n)*?\{((?:.|\n)*?)\};", r"""
+    const deleteMember = (memberId) => {
+        allMembers = allMembers.filter(m => m.id !== memberId);
+        renderMembers(allMembers);
+        window.app.ui.showNotification('success', '會員已模擬刪除');
+    };
+            """, content, flags=re.MULTILINE)
+            print(f"   - 已注入 {js_file.name} 的互動模擬功能。")
+        
+        # 模擬 sales.js 的結帳
+        if js_file.name == 'sales.js':
+            content = re.sub(r'const processCheckout = \(\) => \{((?:.|\n)*?)\};', r"""
+    const processCheckout = () => {
+        window.app.ui.showLoading('結帳中...');
+        setTimeout(() => {
+            window.app.ui.hideLoading();
+            window.app.ui.showNotification('success', '結帳成功！');
+            cart = [];
+            updateCartUI();
+            checkoutModal.classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+        }, 800);
+    };
+            """, content, flags=re.MULTILINE)
+            print(f"   - 已注入 {js_file.name} 的互動模擬功能。")
 
         js_file.write_text(content, "utf-8")
 
@@ -144,13 +177,11 @@ def copy_data_files():
         with open(json_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
-        # 如果 JSON 頂層是一個物件且只有一個 key，其值為 list，則提取該 list
         if isinstance(data, dict) and len(data) == 1 and isinstance(list(data.values())[0], list):
             key = list(data.keys())[0]
             print(f"   - 正在提取 {json_file.name} 中的 '{key}' 陣列...")
             data = data[key]
         
-        # 如果頂層是陣列，且第一個元素是包含 `members` 鍵的字典 (members.json 的特殊情況)
         elif json_file.name == "members.json" and isinstance(data, list) and data and 'members' in data[0]:
              print(f"   - 正在處理 {json_file.name} 的特殊結構...")
              processed_data = []
@@ -187,13 +218,10 @@ def render_and_fix_html_pages():
         template = env.get_template(template_name)
         rendered_html = template.render({"request": None, **context})
         
-        # 【核心修正】將所有絕對路徑改為相對路徑
+        # 將所有絕對路徑改為相對路徑
         rendered_html = re.sub(r'(href|src)="/', r'\1="./', rendered_html)
-        # 修正頁面間的連結 .html
         rendered_html = re.sub(r'href="./(?!static)([^"]+)"', r'href="./\1.html"', rendered_html)
-        # 特殊處理首頁連結
         rendered_html = re.sub(r'href="./index.html"', 'href="./index.html"', rendered_html) 
-        # 修正 purchase form 的特殊連結
         rendered_html = re.sub(r'href="./purchases/new.html"', 'href="./purchase_form.html"', rendered_html)
 
         (DIST_DIR / template_name).write_text(rendered_html, encoding="utf-8")
