@@ -11,7 +11,7 @@ from jinja2 import Environment, FileSystemLoader
 # 專案根目錄
 ROOT_DIR = Path(__file__).parent
 # 靜態網站輸出目錄
-DIST_DIR = ROOT_DIR / "dist"
+DIST_DIR = ROOT_DIR / "docs"
 # 原始資料目錄
 DATA_DIR = ROOT_DIR / "data"
 # 原始靜態資源目錄 (CSS, JS)
