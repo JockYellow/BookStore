@@ -7,10 +7,10 @@ from uuid import uuid4
 @dataclass
 class Supplier:
     name: str  # 供應商名稱
-    id: str = field(default_factory=lambda: str(uuid4()))
     contact: str = ""  # 聯絡方式
     payment_cycle: str = "monthly"  # 結帳週期: monthly(月結), quarterly(季結)
     note: str = ""  # 備註
+    id: str = field(default_factory=lambda: str(uuid4()))
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
@@ -18,11 +18,11 @@ class Supplier:
 @dataclass
 class Product:
     name: str  # 商品名稱
-    id: str = field(default_factory=lambda: str(uuid4()))
     category: str = ""  # 商品分類
     cost_price: float = 0.0  # 成本價
     selling_price: float = 0.0  # 建議售價
     stock: int = 0  # 庫存數量
+    id: str = field(default_factory=lambda: str(uuid4()))
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
@@ -54,12 +54,25 @@ class PurchaseItem:
 @dataclass
 class Member:
     name: str  # 會員姓名
-    id: str = field(default_factory=lambda: str(uuid4()))
     phone: str = ""  # 電話
     email: str = ""  # 電子郵件
     note: str = ""  # 備註
+    id: str = field(default_factory=lambda: str(uuid4()))
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    
+# 付款紀錄模型
+@dataclass
+class Payment:
+    supplier_id: str  # 供應商ID
+    amount: float     # 付款金額
+    payment_date: str # 付款日期
+    id: str = field(default_factory=lambda: str(uuid4()))
+    note: str = ""    # 備註
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    # 關聯的進貨單ID列表 (非必要，但有助於追蹤)
+    purchase_ids: List[str] = field(default_factory=list)   
+
 
 # 銷售記錄模型
 @dataclass
@@ -89,12 +102,15 @@ class SaleItem:
 # 折扣活動模型
 @dataclass
 class Discount:
+    # --- 沒有預設值的欄位放前面 ---
     name: str  # 活動名稱
-    id: str = field(default_factory=lambda: str(uuid4()))
-    discount_type: Literal["percentage", "fixed"] = "percentage"  # 折扣類型: 百分比/固定金額
     value: float  # 折扣值 (百分比: 0-100, 固定金額: 折扣金額)
     valid_from: str  # 活動開始日期
     valid_to: str  # 活動結束日期
+
+    # --- 有預設值的欄位放後面 ---
+    id: str = field(default_factory=lambda: str(uuid4()))
+    discount_type: Literal["percentage", "fixed"] = "percentage"  # 折扣類型: 百分比/固定金額
     target_type: Literal["product", "category", "all"] = "product"  # 適用對象
     target_id: Optional[str] = None  # 對象ID (商品ID或分類名稱)
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
@@ -106,6 +122,7 @@ COLLECTIONS = {
     'products': 'products',
     'purchases': 'purchases',
     'purchase_items': 'purchase_items',
+    'payments': 'payments', 
     'members': 'members',
     'sales': 'sales',
     'sale_items': 'sale_items',

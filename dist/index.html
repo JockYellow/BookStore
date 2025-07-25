@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>儀表板 - 書房記帳與營運管理系統</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/css/styles.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+    <!-- 導航欄 -->
+    <nav class="bg-blue-600 text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="./index.html" class="text-xl font-bold">📚 書房管理系統</a>
+                </div>
+                <div class="hidden md:flex items-center space-x-4">
+                    <a href="./index.html" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
+                        <i class="fas fa-tachometer-alt mr-1"></i> 儀表板
+                    </a>
+                    <a href="./products.html" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
+                        <i class="fas fa-box mr-1"></i> 商品管理
+                    </a>
+                    <a href="./purchases.html" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
+                        <i class="fas fa-shopping-cart mr-1"></i> 進貨管理
+                    </a>
+                    <a href="./sales.html" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
+                        <i class="fas fa-cash-register mr-1"></i> 銷售管理
+                    </a>
+                    <a href="./members.html" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
+                        <i class="fas fa-users mr-1"></i> 會員管理
+                    </a>
+                    <a href="./suppliers.html" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
+                        <i class="fas fa-truck mr-1"></i> 供應商管理
+                    </a>
+                    <a href="./reports.html" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
+                        <i class="fas fa-chart-bar mr-1"></i> 報表分析
+                    </a>
+                </div>
+                <div class="md:hidden flex items-center">
+                    <button id="mobile-menu-button" class="text-white focus:outline-none">
+                        <i class="fas fa-bars text-2xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- 移動端菜單 -->
+        <div id="mobile-menu" class="md:hidden hidden pb-4 px-4">
+            <a href="./index.html" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700">
+                <i class="fas fa-tachometer-alt mr-2"></i> 儀表板
+            </a>
+            <a href="./products.html" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700">
+                <i class="fas fa-box mr-2"></i> 商品管理
+            </a>
+            <a href="./purchases.html" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700">
+                <i class="fas fa-shopping-cart mr-2"></i> 進貨管理
+            </a>
+            <a href="./sales.html" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700">
+                <i class="fas fa-cash-register mr-2"></i> 銷售管理
+            </a>
+            <a href="./members.html" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700">
+                <i class="fas fa-users mr-2"></i> 會員管理
+            </a>
+            <a href="./suppliers.html" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700">
+                <i class="fas fa-truck mr-2"></i> 供應商管理
+            </a>
+            <a href="./reports.html" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700">
+                <i class="fas fa-chart-bar mr-2"></i> 報表分析
+            </a>
+        </div>
+    </nav>
+
+    <!-- 主要內容 -->
+    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        
+<div class="bg-white shadow rounded-lg p-6">
+    <h1 class="text-2xl font-bold text-gray-800 mb-6">儀表板</h1>
+    
+    <!-- 統計卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- 今日銷售額 -->
+        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-blue-100 text-blue-600">
+                    <i class="fas fa-dollar-sign text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-gray-500 text-sm">今日銷售額</p>
+                    <p class="text-2xl font-semibold text-gray-800">$12,345</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 今日訂單數 -->
+        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-green-100 text-green-600">
+                    <i class="fas fa-shopping-cart text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-gray-500 text-sm">今日訂單數</p>
+                    <p class="text-2xl font-semibold text-gray-800">24</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 平均訂單金額 -->
+        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-500">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
+                    <i class="fas fa-receipt text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-gray-500 text-sm">平均訂單金額</p>
+                    <p class="text-2xl font-semibold text-gray-800">$514</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 低庫存商品 -->
+        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-red-500">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-red-100 text-red-600">
+                    <i class="fas fa-exclamation-triangle text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-gray-500 text-sm">低庫存商品</p>
+                    <p class="text-2xl font-semibold text-gray-800">8</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 銷售趨勢圖 -->
+    <div class="bg-white rounded-lg shadow p-6 mb-8">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-semibold text-gray-800">銷售趨勢</h2>
+            <div class="flex space-x-2">
+                <button class="px-3 py-1 text-sm rounded bg-blue-100 text-blue-600">本週</button>
+                <button class="px-3 py-1 text-sm rounded hover:bg-gray-100">本月</button>
+                <button class="px-3 py-1 text-sm rounded hover:bg-gray-100">本年</button>
+            </div>
+        </div>
+        <div class="h-64">
+            <canvas id="salesChart"></canvas>
+        </div>
+    </div>
+    
+    <!-- 最近交易 -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-800">最近交易</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">訂單編號</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">客戶</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">日期</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">金額</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">狀態</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600">#ORD-2023-0001</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">王小明</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2023-05-15 14:30</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">$1,250</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">已完成</span>
+                        </td>
+                    </tr>
+                    <!-- 更多交易記錄... -->
+                </tbody>
+            </table>
+        </div>
+        <div class="bg-gray-50 px-6 py-3 flex items-center justify-between border-t border-gray-200">
+            <div class="text-sm text-gray-500">
+                顯示 <span class="font-medium">1</span> 到 <span class="font-medium">5</span> 筆，共 <span class="font-medium">24</span> 筆結果
+            </div>
+            <div class="flex-1 flex justify-end">
+                <a href="#" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    下一頁
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script>
+// 銷售趨勢圖表
+const salesCtx = document.getElementById('salesChart').getContext('2d');
+const salesChart = new Chart(salesCtx, {
+    type: 'line',
+    data: {
+        labels: ['1月', '2月', '3月', '4月', '5月', '6月'],
+        datasets: [{
+            label: '銷售額',
+            data: [12000, 19000, 15000, 25000, 22000, 30000],
+            borderColor: 'rgb(59, 130, 246)',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            tension: 0.3,
+            fill: true
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                beginAtZero: true,
+                grid: {
+                    drawBorder: false
+                },
+                ticks: {
+                    callback: function(value) {
+                        return '$' + value.toLocaleString();
+                    }
+                }
+            },
+            x: {
+                grid: {
+                    display: false
+                }
+            }
+        },
+        plugins: {
+            legend: {
+                display: false
+            }
+        }
+    }
+});
+</script>
+
+
+
+    </main>
+
+    <!-- 頁腳 -->
+    <footer class="bg-white mt-12">
+        <div class="max-w-7xl mx-auto py-6 px-4 overflow-hidden sm:px-6 lg:px-8">
+            <p class="text-center text-gray-500 text-sm">
+                &copy; 2025 書房記帳與營運管理系統. All rights reserved.
+            </p>
+        </div>
+    </footer>
+
+    <!-- 全局組件 -->
+    <!-- 加載指示器 -->
+<div id="loading" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg p-6 shadow-xl">
+        <div class="flex items-center">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span class="ml-3 text-gray-700">載入中，請稍候...</span>
+        </div>
+    </div>
+</div>
+    <!-- 通知訊息 -->
+<div id="notifications" class="fixed top-4 right-4 z-50 space-y-2 w-80">
+    <!-- 成功通知 -->
+    <div id="success-notification" class="notification hidden bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+        <div class="flex items-center">
+            <i class="fas fa-check-circle mr-2"></i>
+            <span class="notification-message">操作成功！</span>
+        </div>
+        <button class="absolute top-0 bottom-0 right-0 px-4 py-3 close-notification">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    
+    <!-- 錯誤通知 -->
+    <div id="error-notification" class="notification hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+        <div class="flex items-center">
+            <i class="fas fa-exclamation-circle mr-2"></i>
+            <span class="notification-message">發生錯誤！</span>
+        </div>
+        <button class="absolute top-0 bottom-0 right-0 px-4 py-3 close-notification">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    
+    <!-- 警告通知 -->
+    <div id="warning-notification" class="notification hidden bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative" role="alert">
+        <div class="flex items-center">
+            <i class="fas fa-exclamation-triangle mr-2"></i>
+            <span class="notification-message">警告訊息</span>
+        </div>
+        <button class="absolute top-0 bottom-0 right-0 px-4 py-3 close-notification">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+</div>
+    <!-- 確認對話框 -->
+<div id="confirm-dialog" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg shadow-xl w-96">
+        <!-- Header -->
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-medium text-gray-900" id="confirm-title">確認操作</h3>
+        </div>
+        
+        <!-- Body -->
+        <div class="px-6 py-4">
+            <p class="text-gray-600" id="confirm-message">您確定要執行此操作嗎？此操作無法復原。</p>
+        </div>
+        
+        <!-- Footer -->
+        <div class="px-6 py-4 bg-gray-50 text-right rounded-b-lg">
+            <button type="button" id="confirm-cancel" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                取消
+            </button>
+            <button type="button" id="confirm-ok" class="ml-3 inline-flex justify-center px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                確認
+            </button>
+        </div>
+    </div>
+</div>
+
+    <!-- JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/static/js/ui.js"></script>      
+    <script src="/static/js/main.js"></script>    
+<script>
+// 銷售趨勢圖表
+const salesCtx = document.getElementById('salesChart').getContext('2d');
+const salesChart = new Chart(salesCtx, {
+    type: 'line',
+    data: {
+        labels: ['1月', '2月', '3月', '4月', '5月', '6月'],
+        datasets: [{
+            label: '銷售額',
+            data: [12000, 19000, 15000, 25000, 22000, 30000],
+            borderColor: 'rgb(59, 130, 246)',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            tension: 0.3,
+            fill: true
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                beginAtZero: true,
+                grid: {
+                    drawBorder: false
+                },
+                ticks: {
+                    callback: function(value) {
+                        return '$' + value.toLocaleString();
+                    }
+                }
+            },
+            x: {
+                grid: {
+                    display: false
+                }
+            }
+        },
+        plugins: {
+            legend: {
+                display: false
+            }
+        }
+    }
+});
+</script>
+
+</body>
+</html>

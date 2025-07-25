@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
         window.app.ui.showLoading('載入商品中...');
         try {
             // 注意：靜態版本中，這個路徑會被 build 腳本自動替換
-            const response = await fetch('/api/products');
+            const response = await fetch('./data/products.json');
             if (!response.ok) throw new Error('無法獲取商品列表');
             allProducts = await response.json();
             renderTable(allProducts);
