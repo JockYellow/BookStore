@@ -356,7 +356,7 @@ async def create_purchase(purchase: dict):
             
             # 更新商品庫存（如果狀態為已接收）
             if purchase.get("status") == "received":
-                product["stock_quantity"] = product.get("stock_quantity", 0) + quantity
+                product["stock"] = product.get("stock", 0) + quantity
                 product["updated_at"] = now
         
         # 計算稅金和總金額
@@ -464,7 +464,7 @@ def update_inventory_for_purchase(purchase: Dict):
         # 找到對應的產品並更新庫存
         for product in products:
             if product["id"] == product_id:
-                product["stock_quantity"] = str(int(product.get("stock_quantity", 0)) + quantity)
+                product["stock"] = str(int(product.get("stock", 0)) + quantity)
                 product["updated_at"] = datetime.now().isoformat()
                 updated = True
                 break
