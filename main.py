@@ -78,7 +78,14 @@ def load_data(collection_name: str) -> List[Dict]:
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                # Ensure the data is a list
+                if isinstance(data, dict):
+                    # handle legacy structure like {"sales": [...]} or {"members": [...]}  
+                    if len(data) == 1 and isinstance(next(iter(data.values())), list):
+                        logger.info(f"Extracting array from wrapper in {file_path}")
+                        data = next(iter(data.values()))
+                    else:
+                        logger.warning(f"Data in {file_path} is a dict, converting values to list")
+                        data = [data]
                 if not isinstance(data, list):
                     logger.warning(f"Data in {file_path} is not a list, converting to list")
                     data = [data] if data else []
