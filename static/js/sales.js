@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <h3 class="font-medium text-gray-800 text-sm truncate">${p.name}</h3>
                 <div class="mt-2 flex justify-between items-center">
                     <span class="text-lg font-bold text-blue-600">$${p.sale_price}</span>
-                    <span class="text-xs text-gray-500">庫存: ${p.stock_quantity}</span>
+                    <span class="text-xs text-gray-500">庫存: ${p.stock}</span>
                 </div>
             </div>
         `).join('');
