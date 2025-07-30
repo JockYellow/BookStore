@@ -29,13 +29,22 @@ class BaseService:
         """從 JSON 文件載入數據"""
         if self.file_path.exists():
             with open(self.file_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                data = json.load(f)
+                if isinstance(data, list):
+                    # convert list to dict keyed by id
+                    return {item.get('id', str(idx)): item for idx, item in enumerate(data)}
+                if isinstance(data, dict):
+                    # handle wrapped array {"items": [...]}
+                    if len(data) == 1 and isinstance(next(iter(data.values())), list):
+                        arr = next(iter(data.values()))
+                        return {item.get('id', str(idx)): item for idx, item in enumerate(arr)}
+                    return data
         return {}
     
     def _save_data(self):
         """保存數據到 JSON 文件"""
         with open(self.file_path, 'w', encoding='utf-8') as f:
-            json.dump(self._data, f, ensure_ascii=False, indent=2)
+            json.dump(list(self._data.values()), f, ensure_ascii=False, indent=2)
     
     def create(self, item: Dict) -> str:
         """創建新項目"""

@@ -10,6 +10,7 @@ import json
 from datetime import datetime
 import os
 from services.report_service import ReportService
+from utils import validate_required_fields
 import logging
 
 # 配置日誌
@@ -252,6 +253,12 @@ async def create_sale(sale: dict):
     products = load_data("products")
     discounts = load_data("discounts")
 
+    error = validate_required_fields(sale, ["items"])
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    if not isinstance(sale["items"], list) or not sale["items"]:
+        raise HTTPException(status_code=400, detail="銷售項目不能為空")
+
     now = datetime.now()
     sale_id = f"S{now.strftime('%Y%m%d%H%M%S')}"
 
@@ -366,12 +373,11 @@ async def get_purchase(purchase_id: str):
 async def create_purchase(purchase: dict):
     """創建新的進貨記錄"""
     try:
-        # 驗證必填欄位
-        if not purchase.get("supplier_id"):
-            raise HTTPException(status_code=400, detail="供應商不能為空")
-            
-        if not purchase.get("items") or not isinstance(purchase["items"], list):
-            raise HTTPException(status_code=400, detail="進貨項目不能為空")
+        error = validate_required_fields(purchase, ["supplier_id", "items"])
+        if error:
+            raise HTTPException(status_code=400, detail=error)
+        if not isinstance(purchase["items"], list):
+            raise HTTPException(status_code=400, detail="進貨項目格式錯誤")
         
         # 載入現有數據
         purchases = load_data("purchases")
@@ -529,6 +535,10 @@ async def create_member(member: dict):
     members = load_data("members")
     if not isinstance(members, list):
         members = []
+
+    error = validate_required_fields(member, ["name", "phone"])
+    if error:
+        raise HTTPException(status_code=400, detail=error)
         
     # 檢查電話是否已存在
     if any(m.get('phone') == member.get('phone') for m in members):
@@ -629,6 +639,9 @@ async def get_supplier(supplier_id: str):
 @app.post("/api/suppliers")
 async def create_supplier(supplier: dict):
     suppliers = load_data("suppliers")
+    error = validate_required_fields(supplier, ["name"])
+    if error:
+        raise HTTPException(status_code=400, detail=error)
     supplier["id"] = f"S{len(suppliers) + 1:03d}"
     supplier["created_at"] = datetime.now().isoformat()
     suppliers.append(supplier)
@@ -699,9 +712,10 @@ async def create_payment(payment: dict):
     payments = load_data("payments")
     purchases = load_data("purchases")
 
-    if not payment.get("supplier_id"):
-        raise HTTPException(status_code=400, detail="供應商ID不能為空")
-    if not payment.get("amount") or float(payment.get("amount", 0)) <= 0:
+    error = validate_required_fields(payment, ["supplier_id", "amount"])
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    if float(payment.get("amount", 0)) <= 0:
         raise HTTPException(status_code=400, detail="付款金額必須大於0")
 
     payment_id = f"PM{len(payments) + 1:04d}"
