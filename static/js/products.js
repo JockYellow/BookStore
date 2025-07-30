@@ -33,8 +33,8 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('costPrice').value = product.purchase_price || 0; 
             // 修正：使用 product.sale_price
             document.getElementById('salePrice').value = product.sale_price || 0; 
-             // 修正：使用 product.stock_quantity
-            document.getElementById('stock').value = product.stock_quantity || 0;
+             // 修正：使用 product.stock
+            document.getElementById('stock').value = product.stock || 0;
             document.getElementById('minStock').value = product.minStock || 5;
             document.getElementById('unit').value = product.unit || '個';
             document.getElementById('description').value = product.description || '';
@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         productsTableBody.innerHTML = products.map(product => {
-            const stock = parseInt(product.stock_quantity, 10) || 0;
+            const stock = parseInt(product.stock, 10) || 0;
             const minStock = parseInt(product.minStock, 10) || 5;
             let statusBadge;
 
@@ -118,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
             category: formData.get('category'),
             purchase_price: parseFloat(formData.get('costPrice')),
             sale_price: parseFloat(formData.get('salePrice')),
-            stock_quantity: parseInt(formData.get('stock'), 10),
+            stock: parseInt(formData.get('stock'), 10),
             // ... 其他欄位
         };
 

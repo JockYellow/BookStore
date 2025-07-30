@@ -78,7 +78,14 @@ def load_data(collection_name: str) -> List[Dict]:
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                # Ensure the data is a list
+                if isinstance(data, dict):
+                    # handle legacy structure like {"sales": [...]} or {"members": [...]}  
+                    if len(data) == 1 and isinstance(next(iter(data.values())), list):
+                        logger.info(f"Extracting array from wrapper in {file_path}")
+                        data = next(iter(data.values()))
+                    else:
+                        logger.warning(f"Data in {file_path} is a dict, converting values to list")
+                        data = [data]
                 if not isinstance(data, list):
                     logger.warning(f"Data in {file_path} is not a list, converting to list")
                     data = [data] if data else []
@@ -349,7 +356,7 @@ async def create_purchase(purchase: dict):
             
             # 更新商品庫存（如果狀態為已接收）
             if purchase.get("status") == "received":
-                product["stock_quantity"] = product.get("stock_quantity", 0) + quantity
+                product["stock"] = product.get("stock", 0) + quantity
                 product["updated_at"] = now
         
         # 計算稅金和總金額
@@ -457,7 +464,7 @@ def update_inventory_for_purchase(purchase: Dict):
         # 找到對應的產品並更新庫存
         for product in products:
             if product["id"] == product_id:
-                product["stock_quantity"] = str(int(product.get("stock_quantity", 0)) + quantity)
+                product["stock"] = str(int(product.get("stock", 0)) + quantity)
                 product["updated_at"] = datetime.now().isoformat()
                 updated = True
                 break
