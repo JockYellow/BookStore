@@ -10,6 +10,7 @@ import json
 from datetime import datetime
 import os
 from services.report_service import ReportService
+from utils import validate_required_fields
 import logging
 
 # 配置日誌
@@ -47,7 +48,7 @@ DATA_DIR = Path("data")
 DATA_DIR.mkdir(exist_ok=True)
 
 # 初始化數據文件
-DATA_FILES = ["products", "suppliers", "purchases", "sales", "members"]
+DATA_FILES = ["products", "suppliers", "purchases", "sales", "members", "payments", "discounts"]
 
 def initialize_data_files():
     """確保所有需要的數據文件都存在且為有效JSON"""
@@ -250,38 +251,83 @@ async def get_sales():
 async def create_sale(sale: dict):
     sales = load_data("sales")
     products = load_data("products")
-    
-    # 生成銷售編號
+    discounts = load_data("discounts")
+
+    error = validate_required_fields(sale, ["items"])
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    if not isinstance(sale["items"], list) or not sale["items"]:
+        raise HTTPException(status_code=400, detail="銷售項目不能為空")
+
     now = datetime.now()
     sale_id = f"S{now.strftime('%Y%m%d%H%M%S')}"
-    
-    # 更新庫存
+
+    def calc_discount(pid: str, qty: int, price: float) -> float:
+        applicable = [d for d in discounts if d.get("target_type") == "product" and d.get("target_id") == pid]
+        product = next((p for p in products if p["id"] == pid), None)
+        if product and product.get("category"):
+            applicable += [d for d in discounts if d.get("target_type") == "category" and d.get("target_id") == product["category"]]
+        applicable += [d for d in discounts if d.get("target_type") == "all"]
+
+        now_dt = datetime.now()
+        applicable = [
+            d for d in applicable
+            if (not d.get("valid_from") or datetime.fromisoformat(d["valid_from"]) <= now_dt) and
+               (not d.get("valid_to") or datetime.fromisoformat(d["valid_to"]) >= now_dt)
+        ]
+        if not applicable:
+            return 0.0
+        disc = applicable[0]
+        if disc.get("discount_type") == "percentage":
+            return price * qty * (float(disc.get("value", 0)) / 100)
+        return float(disc.get("value", 0)) * qty
+
+    subtotal = 0.0
+    discount_total = 0.0
+
     for item in sale.get("items", []):
         product = next((p for p in products if p["id"] == item["product_id"]), None)
-        if product:
-            product["stock"] -= item["quantity"]
-            if product["stock"] < 0:
-                product["stock"] = 0
-    
-    # 儲存銷售記錄
+        if not product:
+            continue
+        quantity = int(item.get("quantity", 0))
+        unit_price = float(item.get("unit_price", product.get("selling_price", 0)))
+        subtotal += unit_price * quantity
+        discount_total += calc_discount(product["id"], quantity, unit_price)
+
+        product["stock"] -= quantity
+        if product["stock"] < 0:
+            product["stock"] = 0
+
+    total = subtotal - discount_total
+    amount_received = float(sale.get("amount_received", total))
+
     sale_data = {
         "id": sale_id,
-        "items": sale["items"],
+        "items": sale.get("items", []),
         "member_id": sale.get("member_id"),
-        "subtotal": sale["subtotal"],
-        "discount": sale.get("discount", 0),
-        "total": sale["total"],
-        "payment_method": sale["payment_method"],
-        "amount_received": sale["amount_received"],
-        "change": sale["change"],
+        "subtotal": subtotal,
+        "discount": discount_total,
+        "total": total,
+        "payment_method": sale.get("payment_method", "cash"),
+        "amount_received": amount_received,
+        "change": amount_received - total,
         "created_at": now.isoformat(),
         "cashier": sale.get("cashier", "系統管理員")
     }
-    
+
     sales.append(sale_data)
     save_data("sales", sales)
-    save_data("products", products)  # 更新商品庫存
-    
+    save_data("products", products)
+
+    if sale_data.get("member_id"):
+        members = load_data("members")
+        member = next((m for m in members if m["id"] == sale_data["member_id"]), None)
+        if member:
+            member["total_spent"] = member.get("total_spent", 0) + total
+            member["points"] = member.get("points", 0) + int(total // 100)
+            member["updated_at"] = now.isoformat()
+            save_data("members", members)
+
     return {"message": "銷售記錄已建立", "sale_id": sale_id}
 
 # 進貨相關 API
@@ -327,12 +373,11 @@ async def get_purchase(purchase_id: str):
 async def create_purchase(purchase: dict):
     """創建新的進貨記錄"""
     try:
-        # 驗證必填欄位
-        if not purchase.get("supplier_id"):
-            raise HTTPException(status_code=400, detail="供應商不能為空")
-            
-        if not purchase.get("items") or not isinstance(purchase["items"], list):
-            raise HTTPException(status_code=400, detail="進貨項目不能為空")
+        error = validate_required_fields(purchase, ["supplier_id", "items"])
+        if error:
+            raise HTTPException(status_code=400, detail=error)
+        if not isinstance(purchase["items"], list):
+            raise HTTPException(status_code=400, detail="進貨項目格式錯誤")
         
         # 載入現有數據
         purchases = load_data("purchases")
@@ -490,6 +535,10 @@ async def create_member(member: dict):
     members = load_data("members")
     if not isinstance(members, list):
         members = []
+
+    error = validate_required_fields(member, ["name", "phone"])
+    if error:
+        raise HTTPException(status_code=400, detail=error)
         
     # 檢查電話是否已存在
     if any(m.get('phone') == member.get('phone') for m in members):
@@ -590,6 +639,9 @@ async def get_supplier(supplier_id: str):
 @app.post("/api/suppliers")
 async def create_supplier(supplier: dict):
     suppliers = load_data("suppliers")
+    error = validate_required_fields(supplier, ["name"])
+    if error:
+        raise HTTPException(status_code=400, detail=error)
     supplier["id"] = f"S{len(suppliers) + 1:03d}"
     supplier["created_at"] = datetime.now().isoformat()
     suppliers.append(supplier)
@@ -621,14 +673,17 @@ async def delete_supplier(supplier_id: str):
     if supplier_id not in supplier_ids:
         raise HTTPException(status_code=404, detail="供應商不存在")
     
-    # 檢查是否有相關的進貨記錄
+    # 檢查是否有相關的進貨或付款記錄
     purchases = load_data("purchases")
+    payments = load_data("payments")
+
     has_related_purchases = any(p["supplier_id"] == supplier_id for p in purchases)
-    
-    if has_related_purchases:
+    has_related_payments = any(pay.get("supplier_id") == supplier_id for pay in payments)
+
+    if has_related_purchases or has_related_payments:
         raise HTTPException(
-            status_code=400, 
-            detail="無法刪除該供應商，因為有相關的進貨記錄"
+            status_code=400,
+            detail="無法刪除該供應商，因為有相關的進貨或付款記錄"
         )
     
     # 刪除供應商
@@ -636,6 +691,128 @@ async def delete_supplier(supplier_id: str):
     save_data("suppliers", updated_suppliers)
 
     return {"message": "供應商已刪除", "id": supplier_id}
+
+# 付款記錄相關 API
+@app.get("/api/payments")
+async def get_payments():
+    return load_data("payments")
+
+
+@app.get("/api/payments/{payment_id}")
+async def get_payment(payment_id: str):
+    payments = load_data("payments")
+    payment = next((p for p in payments if p["id"] == payment_id), None)
+    if not payment:
+        raise HTTPException(status_code=404, detail="付款紀錄不存在")
+    return payment
+
+
+@app.post("/api/payments")
+async def create_payment(payment: dict):
+    payments = load_data("payments")
+    purchases = load_data("purchases")
+
+    error = validate_required_fields(payment, ["supplier_id", "amount"])
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    if float(payment.get("amount", 0)) <= 0:
+        raise HTTPException(status_code=400, detail="付款金額必須大於0")
+
+    payment_id = f"PM{len(payments) + 1:04d}"
+    now = datetime.now().isoformat()
+
+    payment_data = {
+        "id": payment_id,
+        "supplier_id": payment.get("supplier_id"),
+        "amount": float(payment.get("amount", 0)),
+        "payment_date": payment.get("payment_date", now),
+        "notes": payment.get("notes", ""),
+        "purchase_ids": payment.get("purchase_ids", []),
+        "created_at": now,
+    }
+
+    payments.append(payment_data)
+
+    for pid in payment_data["purchase_ids"]:
+        purchase = next((p for p in purchases if p.get("id") == pid), None)
+        if purchase:
+            purchase["payment_status"] = "paid"
+            purchase["paid"] = True
+            purchase["paid_date"] = now
+
+    save_data("payments", payments)
+    save_data("purchases", purchases)
+
+    return {"message": "付款記錄已建立", "id": payment_id}
+
+# 折扣相關 API
+@app.get("/api/discounts")
+async def get_discounts():
+    return load_data("discounts")
+
+
+@app.get("/api/discounts/{discount_id}")
+async def get_discount(discount_id: str):
+    discounts = load_data("discounts")
+    discount = next((d for d in discounts if d["id"] == discount_id), None)
+    if not discount:
+        raise HTTPException(status_code=404, detail="折扣不存在")
+    return discount
+
+
+@app.post("/api/discounts")
+async def create_discount(discount: dict):
+    discounts = load_data("discounts")
+    discount_id = f"D{len(discounts) + 1:04d}"
+    now = datetime.now().isoformat()
+
+    if not discount.get("name"):
+        raise HTTPException(status_code=400, detail="折扣名稱不能為空")
+    if discount.get("value") is None:
+        raise HTTPException(status_code=400, detail="折扣值必須提供")
+
+    discount_data = {
+        "id": discount_id,
+        "name": discount.get("name", ""),
+        "discount_type": discount.get("discount_type", "percentage"),
+        "value": float(discount.get("value", 0)),
+        "target_type": discount.get("target_type", "product"),
+        "target_id": discount.get("target_id"),
+        "valid_from": discount.get("valid_from"),
+        "valid_to": discount.get("valid_to"),
+        "created_at": now,
+        "updated_at": now,
+    }
+
+    discounts.append(discount_data)
+    save_data("discounts", discounts)
+    return {"message": "折扣已建立", "id": discount_id}
+
+
+@app.put("/api/discounts/{discount_id}")
+async def update_discount(discount_id: str, discount: dict):
+    discounts = load_data("discounts")
+    index = next((i for i, d in enumerate(discounts) if d["id"] == discount_id), None)
+    if index is None:
+        raise HTTPException(status_code=404, detail="折扣不存在")
+
+    discount["id"] = discount_id
+    discount["created_at"] = discounts[index].get("created_at")
+    discount["updated_at"] = datetime.now().isoformat()
+    discounts[index] = discount
+    save_data("discounts", discounts)
+    return {"message": "折扣已更新", "id": discount_id}
+
+
+@app.delete("/api/discounts/{discount_id}")
+async def delete_discount(discount_id: str):
+    discounts = load_data("discounts")
+    index = next((i for i, d in enumerate(discounts) if d["id"] == discount_id), None)
+    if index is None:
+        raise HTTPException(status_code=404, detail="折扣不存在")
+    discounts.pop(index)
+    save_data("discounts", discounts)
+    return {"message": "折扣已刪除", "id": discount_id}
 
 # 報表相關 API
 @app.get("/api/reports/overview")
