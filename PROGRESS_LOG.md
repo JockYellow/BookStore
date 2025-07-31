@@ -11,4 +11,6 @@ This log captures progress on resolving data issues and implementing features.
 - Added `validate_required_fields` helper and integrated basic validation into API endpoints.
 - Refactored `BaseService` to transparently handle list-based JSON files.
 - Created `init_data.py` script for initializing empty data files.
+- Added unit tests for validation and service helpers.
+
 
