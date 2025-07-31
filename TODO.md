@@ -16,8 +16,8 @@ This document tracks outstanding tasks for the project and records progress on r
 - [x] Provide CRUD for discount objects and integrate with sale calculations.
 - [x] Update member statistics when sales are created.
 - [x] Improve delete operations to check for related records (e.g. suppliers with payments).
+- [x] Added optional FastAPI/uvicorn stubs for offline testing.
 - [x] Add data validation helpers and better error handling.
 - [x] Write initialization script.
 - [x] Review `BaseService` data model mismatch (dictionary vs list) and refactor if needed.
-
 

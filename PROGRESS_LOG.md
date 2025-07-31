@@ -13,4 +13,8 @@ This log captures progress on resolving data issues and implementing features.
 - Created `init_data.py` script for initializing empty data files.
 - Added unit tests for validation and service helpers.
 
+## 2025-08-01
+- Added optional stubs for FastAPI and uvicorn so tests run without network dependencies.
+- Cleaned up stray `__pycache__` directories from the repository.
+
 
