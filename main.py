@@ -410,7 +410,6 @@ async def get_purchase(purchase_id: str):
         for item in purchase.get("items", []):
             product = next((p for p in products if str(p.get("id")) == str(item.get("product_id"))), {})
             item["product_name"] = product.get("name", "未知商品")
-            item["barcode"] = product.get("barcode", "")
         
         return {"data": purchase}
     except HTTPException:

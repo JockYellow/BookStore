@@ -26,7 +26,6 @@ document.addEventListener('DOMContentLoaded', () => {
             modalTitle.textContent = '編輯商品';
             document.getElementById('productId').value = product.id;
             document.getElementById('productName').value = product.name || '';
-            document.getElementById('barcode').value = product.barcode || '';
             document.getElementById('category').value = product.category || '';
             document.getElementById('supplier').value = product.supplier_id || '';
             // 修正：使用 product.purchase_price
@@ -71,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 渲染商品表格
     const renderTable = (products) => {
         if (products.length === 0) {
-            productsTableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4">沒有商品資料</td></tr>`;
+            productsTableBody.innerHTML = `<tr><td colspan="7" class="text-center py-4">沒有商品資料</td></tr>`;
             return;
         }
 
@@ -91,7 +90,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return `
                 <tr data-id="${product.id}">
                     <td class="px-6 py-4 whitespace-nowrap">${product.name}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">${product.barcode || '-'}</td>
                     <td class="px-6 py-4 whitespace-nowrap">${product.category || '-'}</td>
                     <td class="px-6 py-4 whitespace-nowrap">$${product.purchase_price || 0}</td>
                     <td class="px-6 py-4 whitespace-nowrap">$${product.sale_price || 0}</td>
@@ -114,7 +112,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const formData = new FormData(productForm);
         const productData = {
             name: formData.get('productName'),
-            barcode: formData.get('barcode'),
             category: formData.get('category'),
             purchase_price: parseFloat(formData.get('costPrice')),
             sale_price: parseFloat(formData.get('salePrice')),

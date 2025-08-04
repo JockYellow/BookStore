@@ -1,7 +1,6 @@
 [
   {
     "name": "原子習慣",
-    "barcode": "9789861755267",
     "category": "書籍",
     "purchase_price": 280,
     "sale_price": 350,
@@ -13,7 +12,6 @@
   {
     "id": "P002",
     "name": "被討厭的勇氣",
-    "barcode": "9789861342483",
     "category": "心理勵志",
     "purchase_price": 220,
     "sale_price": 280,
@@ -25,7 +23,6 @@
   {
     "id": "P101",
     "name": "筆記本",
-    "barcode": "4711234567890",
     "category": "文具",
     "purchase_price": 15,
     "sale_price": 25,
@@ -37,7 +34,6 @@
   {
     "id": "P102",
     "name": "原子筆",
-    "barcode": "4711234567906",
     "category": "文具",
     "purchase_price": 8,
     "sale_price": 15,
@@ -49,7 +45,6 @@
   {
     "id": "P201",
     "name": "高級鋼筆",
-    "barcode": "4711234567913",
     "category": "文具",
     "purchase_price": 900,
     "sale_price": 1200,
@@ -61,7 +56,6 @@
   {
     "id": "P301",
     "name": "高級書架",
-    "barcode": "4711234567920",
     "category": "傢俱",
     "purchase_price": 2000,
     "sale_price": 2500,
@@ -73,7 +67,6 @@
   {
     "id": "P401",
     "name": "暢銷小說",
-    "barcode": "9789573328888",
     "category": "小說",
     "purchase_price": 140,
     "sale_price": 180,
@@ -85,7 +78,6 @@
   {
     "id": "P402",
     "name": "商業理財書",
-    "barcode": "9789863441234",
     "category": "商業",
     "purchase_price": 180,
     "sale_price": 220,
@@ -97,7 +89,6 @@
   {
     "id": "P403",
     "name": "兒童繪本",
-    "barcode": "9789577623456",
     "category": "兒童",
     "purchase_price": 120,
     "sale_price": 150,

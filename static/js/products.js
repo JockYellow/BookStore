@@ -16,9 +16,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusFilter = document.getElementById('statusFilter');
 
     // 表單內元素
-    const productImageInput = document.getElementById('productImage');
-    const imagePreview = document.getElementById('imagePreview');
-    const barcodeInput = document.getElementById('barcode');
     const supplierSelect = document.getElementById('supplier');
 
     let allProducts = [];
@@ -33,7 +30,6 @@ document.addEventListener('DOMContentLoaded', () => {
             modalTitle.textContent = '編輯商品';
             document.getElementById('productId').value = product.id;
             document.getElementById('productName').value = product.name || '';
-            document.getElementById('barcode').value = product.barcode || '';
             document.getElementById('category').value = product.category || '';
             document.getElementById('supplier').value = product.supplier_id || '';
             document.getElementById('costPrice').value = product.purchase_price || 0;
@@ -42,10 +38,8 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('minStock').value = product.min_stock || product.minStock || 5;
             document.getElementById('unit').value = product.unit || '';
             document.getElementById('description').value = product.description || '';
-            imagePreview.src = product.image || 'https://via.placeholder.com/150';
         } else {
             modalTitle.textContent = '新增商品';
-            imagePreview.src = 'https://via.placeholder.com/150';
         }
 
         productModal.classList.remove('hidden');
@@ -91,7 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
     /** 渲染商品表格 */
     const renderTable = (products) => {
         if (products.length === 0) {
-            productsTableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4">沒有商品資料</td></tr>`;
+            productsTableBody.innerHTML = `<tr><td colspan="7" class="text-center py-4">沒有商品資料</td></tr>`;
             return;
         }
 
@@ -109,7 +103,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return `
                 <tr data-id="${product.id}">
                     <td>${product.name}</td>
-                    <td>${product.barcode || '-'}</td>
                     <td>${product.category || '-'}</td>
                     <td>${product.purchase_price || 0}</td>
                     <td>${product.sale_price || 0}</td>
@@ -130,8 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const status = statusFilter.value;
         const filtered = allProducts.filter(p => {
             const nameMatch = (p.name || '').toLowerCase().includes(searchText);
-            const barcodeMatch = (p.barcode || '').toLowerCase().includes(searchText);
-            const matchSearch = nameMatch || barcodeMatch;
+            const matchSearch = nameMatch;
             const matchCategory = !category || p.category === category;
             const stock = parseInt(p.stock, 10) || 0;
             const min = parseInt(p.min_stock || p.minStock || 5, 10);
@@ -192,7 +184,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const formData = new FormData(productForm);
         const productData = {
             name: formData.get('productName').trim(),
-            barcode: formData.get('barcode').trim(),
             category: formData.get('category'),
             supplier_id: formData.get('supplier'),
             purchase_price: parseFloat(formData.get('costPrice')) || 0,
@@ -262,39 +253,6 @@ document.addEventListener('DOMContentLoaded', () => {
     cancelProductBtn.addEventListener('click', closeModal);
     saveProductBtn.addEventListener('click', handleFormSubmit);
     productsTableBody.addEventListener('click', handleTableClick);
-
-    // 圖片預覽
-    productImageInput.addEventListener('change', (event) => {
-        const file = event.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => { imagePreview.src = e.target.result; };
-            reader.readAsDataURL(file);
-        } else {
-            imagePreview.src = 'https://via.placeholder.com/150';
-        }
-    });
-
-    // 條碼掃描模擬
-    let barcodeBuffer = '';
-    let lastKeyTime = 0;
-    const SCAN_INTERVAL = 100;
-    barcodeInput.addEventListener('keydown', (e) => {
-        const currentTime = Date.now();
-        if (currentTime - lastKeyTime > SCAN_INTERVAL) {
-            barcodeBuffer = '';
-        }
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            if (barcodeBuffer) {
-                barcodeInput.value = barcodeBuffer;
-            }
-            barcodeBuffer = '';
-        } else if (e.key.length === 1) {
-            barcodeBuffer += e.key;
-        }
-        lastKeyTime = currentTime;
-    });
 
     // 初始化
     loadSuppliers();
