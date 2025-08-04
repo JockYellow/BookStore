@@ -14,9 +14,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('searchInput');
     const categoryFilter = document.getElementById('categoryFilter');
     const statusFilter = document.getElementById('statusFilter');
+    const supplierFilter = document.getElementById('supplierFilter');
+    const sortSelect = document.getElementById('sortSelect');
 
     // 表單內元素
     const supplierSelect = document.getElementById('supplier');
+    const costPriceInput = document.getElementById('costPrice');
+    const stockInput = document.getElementById('stock');
 
     let allProducts = [];
     let suppliers = [];
@@ -38,8 +42,14 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('minStock').value = product.min_stock || product.minStock || 5;
             document.getElementById('unit').value = product.unit || '';
             document.getElementById('description').value = product.description || '';
+            supplierSelect.disabled = true;
+            costPriceInput.disabled = true;
+            stockInput.disabled = true;
         } else {
             modalTitle.textContent = '新增商品';
+            supplierSelect.disabled = false;
+            costPriceInput.disabled = false;
+            stockInput.disabled = false;
         }
 
         productModal.classList.remove('hidden');
@@ -58,8 +68,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch('/api/suppliers');
             if (res.ok) {
                 suppliers = await res.json();
-                supplierSelect.innerHTML = '<option value="">選擇供應商</option>' +
-                    suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+                const optionsHtml = suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+                supplierSelect.innerHTML = '<option value="">選擇供應商</option>' + optionsHtml;
+                supplierFilter.innerHTML = '<option value="">所有供應商</option>' + optionsHtml;
             }
         } catch (err) {
             console.warn('載入供應商失敗', err);
@@ -85,7 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
     /** 渲染商品表格 */
     const renderTable = (products) => {
         if (products.length === 0) {
-            productsTableBody.innerHTML = `<tr><td colspan="7" class="text-center py-4">沒有商品資料</td></tr>`;
+            productsTableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4">沒有商品資料</td></tr>`;
             return;
         }
 
@@ -100,17 +111,18 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 statusBadge = '庫存正常';
             }
+            const supplierName = suppliers.find(s => s.id === product.supplier_id)?.name || '-';
             return `
                 <tr data-id="${product.id}">
                     <td>${product.name}</td>
                     <td>${product.category || '-'}</td>
+                    <td>${supplierName}</td>
                     <td>${product.purchase_price || 0}</td>
                     <td>${product.sale_price || 0}</td>
                     <td>${stock}</td>
                     <td>${statusBadge}</td>
                     <td class="text-right text-sm font-medium">
                         <button class="edit-btn text-blue-600 hover:underline">編輯</button>
-                        <button class="delete-btn text-red-600 hover:underline ml-4">刪除</button>
                     </td>
                 </tr>`;
         }).join('');
@@ -121,7 +133,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const searchText = searchInput.value.trim().toLowerCase();
         const category = categoryFilter.value;
         const status = statusFilter.value;
-        const filtered = allProducts.filter(p => {
+        const supplier = supplierFilter.value;
+        let filtered = allProducts.filter(p => {
             const nameMatch = (p.name || '').toLowerCase().includes(searchText);
             const matchSearch = nameMatch;
             const matchCategory = !category || p.category === category;
@@ -131,14 +144,28 @@ document.addEventListener('DOMContentLoaded', () => {
             if (status === 'in_stock') statusMatch = stock > min;
             if (status === 'low_stock') statusMatch = stock > 0 && stock <= min;
             if (status === 'out_of_stock') statusMatch = stock <= 0;
-            return matchSearch && matchCategory && statusMatch;
+            const supplierMatch = !supplier || p.supplier_id === supplier;
+            return matchSearch && matchCategory && statusMatch && supplierMatch;
         });
+        const sortValue = sortSelect.value;
+        if (sortValue) {
+            const [field, direction] = sortValue.split('_');
+            filtered.sort((a, b) => {
+                const aVal = a[field] || 0;
+                const bVal = b[field] || 0;
+                if (aVal < bVal) return direction === 'asc' ? -1 : 1;
+                if (aVal > bVal) return direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
         renderTable(filtered);
     };
 
     searchInput.addEventListener('input', filterAndRender);
     categoryFilter.addEventListener('change', filterAndRender);
     statusFilter.addEventListener('change', filterAndRender);
+    supplierFilter.addEventListener('change', filterAndRender);
+    sortSelect.addEventListener('change', filterAndRender);
 
     /** API：新增商品 */
     const createProduct = async (productData) => {
@@ -168,15 +195,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return res.json();
     };
 
-    /** API：刪除商品 */
-    const deleteProductApi = async (id) => {
-        const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.detail || '刪除商品失敗');
-        }
-    };
-
     /** 處理表單提交 */
     const handleFormSubmit = async () => {
         const productId = document.getElementById('productId').value;
@@ -185,14 +203,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const productData = {
             name: formData.get('productName').trim(),
             category: formData.get('category'),
-            supplier_id: formData.get('supplier'),
-            purchase_price: parseFloat(formData.get('costPrice')) || 0,
             sale_price: parseFloat(formData.get('salePrice')) || 0,
-            stock: parseInt(formData.get('stock'), 10) || 0,
             min_stock: parseInt(formData.get('minStock'), 10) || 0,
             unit: formData.get('unit').trim(),
             description: formData.get('description').trim(),
         };
+        if (!isEdit) {
+            productData.supplier_id = formData.get('supplier');
+            productData.purchase_price = parseFloat(formData.get('costPrice')) || 0;
+            productData.stock = parseInt(formData.get('stock'), 10) || 0;
+        }
 
         window.app.ui.showLoading('儲存中...');
         try {
@@ -223,28 +243,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (target.closest('.edit-btn')) {
             if (product) showModal(true, product);
-        }
-
-        if (target.closest('.delete-btn')) {
-            window.app.ui.showConfirmDialog({
-                title: '確認刪除',
-                message: `您確定要刪除商品 #${productId} 嗎？此操作無法復原。`,
-                confirmText: '確認刪除',
-            }).then(async (confirmed) => {
-                if (confirmed) {
-                    window.app.ui.showLoading('刪除中...');
-                    try {
-                        await deleteProductApi(productId);
-                        window.app.ui.showNotification('success', '商品已刪除');
-                        await loadProducts();
-                    } catch (error) {
-                        console.error('刪除失敗:', error);
-                        window.app.ui.showNotification('error', error.message);
-                    } finally {
-                        window.app.ui.hideLoading();
-                    }
-                }
-            });
         }
     };
 

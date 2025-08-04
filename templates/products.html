@@ -33,6 +33,18 @@
                     <option value="low_stock">低庫存</option>
                     <option value="out_of_stock">無庫存</option>
                 </select>
+                <select id="supplierFilter" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                    <option value="">所有供應商</option>
+                </select>
+                <select id="sortSelect" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                    <option value="">排序方式</option>
+                    <option value="name_asc">名稱 A→Z</option>
+                    <option value="name_desc">名稱 Z→A</option>
+                    <option value="sale_price_asc">售價低到高</option>
+                    <option value="sale_price_desc">售價高到低</option>
+                    <option value="stock_asc">庫存少到多</option>
+                    <option value="stock_desc">庫存多到少</option>
+                </select>
             </div>
         </div>
     </div>
@@ -44,6 +56,7 @@
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">商品名稱</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">類別</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">供應商</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">成本價</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">售價</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">庫存</th>
@@ -54,7 +67,7 @@
             <tbody id="productsTableBody" class="bg-white divide-y divide-gray-200">
                 <!-- 商品數據將通過 JavaScript 動態加載 -->
                 <tr>
-                    <td colspan="7" class="px-6 py-4 text-center text-gray-500">
+                    <td colspan="8" class="px-6 py-4 text-center text-gray-500">
                         載入中...
                     </td>
                 </tr>
