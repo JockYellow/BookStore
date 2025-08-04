@@ -1,8 +1,7 @@
-// static/js/products.js - 完整商品管理功能
+// static/js/products.js 僅保留「編輯商品」功能
 
 document.addEventListener('DOMContentLoaded', () => {
     // DOM 元素
-    const addProductBtn = document.getElementById('addProductBtn');
     const productModal = document.getElementById('productModal');
     const modalTitle = document.getElementById('modalTitle');
     const productForm = document.getElementById('productForm');
@@ -25,32 +24,24 @@ document.addEventListener('DOMContentLoaded', () => {
     let allProducts = [];
     let suppliers = [];
 
-    /** 顯示商品 Modal */
-    const showModal = (isEdit = false, product = null) => {
+    /** 顯示商品 Modal（僅限編輯） */
+    const showModal = (product) => {
+        if (!product) return;
         productForm.reset();
-        document.getElementById('productId').value = '';
-
-        if (isEdit && product) {
-            modalTitle.textContent = '編輯商品';
-            document.getElementById('productId').value = product.id;
-            document.getElementById('productName').value = product.name || '';
-            document.getElementById('category').value = product.category || '';
-            document.getElementById('supplier').value = product.supplier_id || '';
-            document.getElementById('costPrice').value = product.purchase_price || 0;
-            document.getElementById('salePrice').value = product.sale_price || 0;
-            document.getElementById('stock').value = product.stock || 0;
-            document.getElementById('minStock').value = product.min_stock || product.minStock || 5;
-            document.getElementById('unit').value = product.unit || '';
-            document.getElementById('description').value = product.description || '';
-            supplierSelect.disabled = true;
-            costPriceInput.disabled = true;
-            stockInput.disabled = true;
-        } else {
-            modalTitle.textContent = '新增商品';
-            supplierSelect.disabled = false;
-            costPriceInput.disabled = false;
-            stockInput.disabled = false;
-        }
+        modalTitle.textContent = '編輯商品';
+        document.getElementById('productId').value = product.id;
+        document.getElementById('productName').value = product.name || '';
+        document.getElementById('category').value = product.category || '';
+        document.getElementById('supplier').value = product.supplier_id || '';
+        document.getElementById('costPrice').value = product.purchase_price || 0;
+        document.getElementById('salePrice').value = product.sale_price || 0;
+        document.getElementById('stock').value = product.stock || 0;
+        document.getElementById('minStock').value = product.min_stock || product.minStock || 5;
+        document.getElementById('unit').value = product.unit || '';
+        document.getElementById('description').value = product.description || '';
+        supplierSelect.disabled = true;
+        costPriceInput.disabled = true;
+        stockInput.disabled = true;
 
         productModal.classList.remove('hidden');
         document.body.classList.add('overflow-hidden');
@@ -68,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch('/api/suppliers');
             if (res.ok) {
                 suppliers = await res.json();
-                const optionsHtml = suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+                const optionsHtml = suppliers.map(s => `<option value="\${s.id}">\${s.name}</option>`).join('');
                 supplierSelect.innerHTML = '<option value="">選擇供應商</option>' + optionsHtml;
                 supplierFilter.innerHTML = '<option value="">所有供應商</option>' + optionsHtml;
             }
@@ -96,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
     /** 渲染商品表格 */
     const renderTable = (products) => {
         if (products.length === 0) {
-            productsTableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4">沒有商品資料</td></tr>`;
+            productsTableBody.innerHTML = '<tr><td colspan="8" class="text-center py-4">沒有商品資料</td></tr>';
             return;
         }
 
@@ -112,19 +103,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 statusBadge = '庫存正常';
             }
             const supplierName = suppliers.find(s => s.id === product.supplier_id)?.name || '-';
-            return `
-                <tr data-id="${product.id}">
-                    <td>${product.name}</td>
-                    <td>${product.category || '-'}</td>
-                    <td>${supplierName}</td>
-                    <td>${product.purchase_price || 0}</td>
-                    <td>${product.sale_price || 0}</td>
-                    <td>${stock}</td>
-                    <td>${statusBadge}</td>
+            return \`
+                <tr data-id="\${product.id}">
+                    <td>\${product.name}</td>
+                    <td>\${product.category || '-'}</td>
+                    <td>\${supplierName}</td>
+                    <td>\${product.purchase_price || 0}</td>
+                    <td>\${product.sale_price || 0}</td>
+                    <td>\${stock}</td>
+                    <td>\${statusBadge}</td>
                     <td class="text-right text-sm font-medium">
                         <button class="edit-btn text-blue-600 hover:underline">編輯</button>
                     </td>
-                </tr>`;
+                </tr>\`;
         }).join('');
     };
 
@@ -136,7 +127,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const supplier = supplierFilter.value;
         let filtered = allProducts.filter(p => {
             const nameMatch = (p.name || '').toLowerCase().includes(searchText);
-            const matchSearch = nameMatch;
             const matchCategory = !category || p.category === category;
             const stock = parseInt(p.stock, 10) || 0;
             const min = parseInt(p.min_stock || p.minStock || 5, 10);
@@ -145,7 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (status === 'low_stock') statusMatch = stock > 0 && stock <= min;
             if (status === 'out_of_stock') statusMatch = stock <= 0;
             const supplierMatch = !supplier || p.supplier_id === supplier;
-            return matchSearch && matchCategory && statusMatch && supplierMatch;
+            return nameMatch && matchCategory && statusMatch && supplierMatch;
         });
         const sortValue = sortSelect.value;
         if (sortValue) {
@@ -167,23 +157,9 @@ document.addEventListener('DOMContentLoaded', () => {
     supplierFilter.addEventListener('change', filterAndRender);
     sortSelect.addEventListener('change', filterAndRender);
 
-    /** API：新增商品 */
-    const createProduct = async (productData) => {
-        const res = await fetch('/api/products', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(productData)
-        });
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.detail || '新增商品失敗');
-        }
-        return res.json();
-    };
-
     /** API：更新商品 */
     const updateProductApi = async (id, productData) => {
-        const res = await fetch(`/api/products/${id}`, {
+        const res = await fetch(\`/api/products/\${id}\`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(productData)
@@ -198,7 +174,10 @@ document.addEventListener('DOMContentLoaded', () => {
     /** 處理表單提交 */
     const handleFormSubmit = async () => {
         const productId = document.getElementById('productId').value;
-        const isEdit = !!productId;
+        if (!productId) {
+            window.app.ui.showNotification('error', '缺少商品ID');
+            return;
+        }
         const formData = new FormData(productForm);
         const productData = {
             name: formData.get('productName').trim(),
@@ -206,23 +185,13 @@ document.addEventListener('DOMContentLoaded', () => {
             sale_price: parseFloat(formData.get('salePrice')) || 0,
             min_stock: parseInt(formData.get('minStock'), 10) || 0,
             unit: formData.get('unit').trim(),
-            description: formData.get('description').trim(),
+            description: formData.get('description').trim()
         };
-        if (!isEdit) {
-            productData.supplier_id = formData.get('supplier');
-            productData.purchase_price = parseFloat(formData.get('costPrice')) || 0;
-            productData.stock = parseInt(formData.get('stock'), 10) || 0;
-        }
 
         window.app.ui.showLoading('儲存中...');
         try {
-            if (isEdit) {
-                await updateProductApi(productId, productData);
-                window.app.ui.showNotification('success', '商品已更新');
-            } else {
-                await createProduct(productData);
-                window.app.ui.showNotification('success', '商品已新增');
-            }
+            await updateProductApi(productId, productData);
+            window.app.ui.showNotification('success', '商品已更新');
             await loadProducts();
             closeModal();
         } catch (error) {
@@ -233,26 +202,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    /** 處理表格中的點擊 (編輯/刪除) */
+    /** 處理表格中的點擊 (編輯) */
     const handleTableClick = (e) => {
         const target = e.target;
         const row = target.closest('tr');
         if (!row) return;
         const productId = row.dataset.id;
         const product = allProducts.find(p => p.id === productId);
-
         if (target.closest('.edit-btn')) {
-            if (product) showModal(true, product);
+            if (product) showModal(product);
         }
     };
 
-    // 事件監聽器
-    addProductBtn.addEventListener('click', () => showModal());
     cancelProductBtn.addEventListener('click', closeModal);
     saveProductBtn.addEventListener('click', handleFormSubmit);
     productsTableBody.addEventListener('click', handleTableClick);
 
-    // 初始化
     loadSuppliers();
     loadProducts();
 });

@@ -247,18 +247,6 @@ async def get_product(product_id: str):
         raise HTTPException(status_code=404, detail="商品不存在")
     return product
 
-@app.post("/api/products")
-async def create_product(product: dict):
-    products = load_data("products")
-    if not isinstance(products, list):
-        products = []
-    product["id"] = f"P{len(products) + 1:03d}"
-    product["created_at"] = datetime.now().isoformat()
-    product["updated_at"] = datetime.now().isoformat()
-    products.append(product)
-    save_data("products", products)
-    return {"message": "商品新增成功", "id": product["id"]}
-
 @app.put("/api/products/{product_id}")
 async def update_product(product_id: str, product_data: dict):
     products = load_data("products")
