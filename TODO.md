@@ -20,4 +20,9 @@ This document tracks outstanding tasks for the project and records progress on r
 - [x] Add data validation helpers and better error handling.
 - [x] Write initialization script.
 - [x] Review `BaseService` data model mismatch (dictionary vs list) and refactor if needed.
-
+- [x] `templates/sales.html`: Added missing elements required by `sales.js`.
+- [x] `static/js/purchases.js`: Implemented create and delete functionality.
+- [x] `static/js/reports.js`: Fetched sales and category data from API and redrew charts.
+- [x] `static/js/members.js`: Confirmed member create/edit/delete actions are API-connected.
+- [x] `static/js/suppliers.js`: Confirmed supplier management actions are API-connected.
+- [x] `static/js/products.js`: Implemented product image upload and barcode scanning.

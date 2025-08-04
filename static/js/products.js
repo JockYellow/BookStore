@@ -1,6 +1,11 @@
 
 let allProducts = []; // 用於儲存所有商品資料
 
+// DOM 元素
+const productImageInput = document.getElementById('productImage');
+const imagePreview = document.getElementById('imagePreview');
+const barcodeInput = document.getElementById('barcode');
+
 /**
  * 根據搜尋文字、分類與庫存狀態過濾商品，並重新渲染表格。
  */
@@ -30,11 +35,10 @@ categoryFilter.addEventListener('change', filterAndRender);
 statusFilter.addEventListener('change', filterAndRender);
 
 // 呼叫 API 新增商品
-const createProduct = async (productData) => {
+const createProduct = async (formData) => {
     const res = await fetch('/api/products', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(productData)
+        body: formData // Send FormData directly
     });
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -44,11 +48,10 @@ const createProduct = async (productData) => {
 };
 
 // 呼叫 API 更新商品
-const updateProductApi = async (id, productData) => {
+const updateProductApi = async (id, formData) => {
     const res = await fetch(`/api/products/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(productData)
+        body: formData // Send FormData directly
     });
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -68,14 +71,32 @@ const deleteProductApi = async (id) => {
 
 // 處理表單提交
 const handleFormSubmit = async () => {
-    // 呼叫後端 API 儲存商品資料
+    const productId = document.getElementById('productId').value;
+    const isEdit = !!productId;
+
+    const formData = new FormData();
+    formData.append('name', document.getElementById('productName').value);
+    formData.append('barcode', document.getElementById('barcode').value);
+    formData.append('category', document.getElementById('category').value);
+    formData.append('supplier_id', document.getElementById('supplier').value);
+    formData.append('purchase_price', document.getElementById('costPrice').value);
+    formData.append('sale_price', document.getElementById('salePrice').value);
+    formData.append('stock', document.getElementById('stock').value);
+    formData.append('min_stock', document.getElementById('minStock').value);
+    formData.append('unit', document.getElementById('unit').value);
+    formData.append('description', document.getElementById('description').value);
+
+    if (productImageInput.files[0]) {
+        formData.append('image', productImageInput.files[0]);
+    }
+
     window.app.ui.showLoading('儲存中...');
     try {
         if (isEdit) {
-            await updateProductApi(productId, productData);
+            await updateProductApi(productId, formData);
             window.app.ui.showNotification('success', '商品已更新');
         } else {
-            await createProduct(productData);
+            await createProduct(formData);
             window.app.ui.showNotification('success', '商品已新增');
         }
         await loadProducts();
@@ -135,8 +156,8 @@ const renderTable = (products) => {
                 <td>${product.name}</td>
                 <td>${product.barcode || '-'}</td>
                 <td>${product.category || '-'}</td>
-                <td>$${product.purchase_price || 0}</td>
-                <td>$${product.sale_price || 0}</td>
+                <td>${product.purchase_price || 0}</td>
+                <td>${product.sale_price || 0}</td>
                 <td>${stock}</td>
                 <td>${statusBadge}</td>
                 <td><button class="edit-btn text-blue-600 hover:underline">編輯</button></td>
@@ -145,3 +166,42 @@ const renderTable = (products) => {
         `;
     }).join('');
 };
+
+// Image preview handler
+productImageInput.addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            imagePreview.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    } else {
+        imagePreview.src = 'https://via.placeholder.com/150'; // Default placeholder
+    }
+});
+
+// Barcode scanning simulation (listen for rapid input)
+let barcodeBuffer = '';
+let lastKeyTime = 0;
+const SCAN_INTERVAL = 100; // milliseconds
+
+barcodeInput.addEventListener('keydown', (e) => {
+    const currentTime = new Date().getTime();
+    if (currentTime - lastKeyTime > SCAN_INTERVAL) {
+        barcodeBuffer = ''; // Reset buffer if pause is too long
+    }
+    if (e.key === 'Enter') {
+        e.preventDefault(); // Prevent form submission
+        if (barcodeBuffer) {
+            console.log('Scanned Barcode:', barcodeBuffer);
+            // Here you would typically trigger a product lookup or other action
+            // For now, we just log it.
+            barcodeInput.value = barcodeBuffer; // Set the input value to the scanned barcode
+        }
+        barcodeBuffer = ''; // Clear buffer after processing
+    } else if (e.key.length === 1) { // Only append single character keys
+        barcodeBuffer += e.key;
+    }
+    lastKeyTime = currentTime;
+});
