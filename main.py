@@ -91,7 +91,10 @@ app.mount("/static", StaticFiles(directory=static_dir), name="static")
 # 設置模板目錄
 templates_dir = Path("templates")
 templates_dir.mkdir(exist_ok=True)
-templates = Jinja2Templates(directory=templates_dir)
+try:
+    templates = Jinja2Templates(directory=templates_dir)
+except Exception:  # pragma: no cover - allow tests without jinja2
+    templates = None
 
 # 數據目錄
 DATA_DIR = Path("data")
@@ -220,8 +223,21 @@ async def reports_page(request: Request):
 
 # 商品相關 API
 @app.get("/api/products")
-async def get_products():
-    return load_data("products")
+async def get_products(supplier_id: str | None = None, sort_by: str | None = None, order: str = "asc"):
+    """取得商品列表，支援按供應商篩選與排序"""
+    products = load_data("products") or []
+
+    if supplier_id:
+        products = [p for p in products if p.get("supplier_id") == supplier_id]
+
+    if sort_by:
+        reverse = (order == "desc")
+        products.sort(
+            key=lambda x: x.get(sort_by) if isinstance(x.get(sort_by), (int, float)) else str(x.get(sort_by, "")),
+            reverse=reverse,
+        )
+
+    return products
 
 @app.get("/api/products/{product_id}")
 async def get_product(product_id: str):
@@ -248,38 +264,30 @@ async def update_product(product_id: str, product_data: dict):
     products = load_data("products")
     if not isinstance(products, list):
         products = []
-    
+
     product_index = next((i for i, p in enumerate(products) if p["id"] == product_id), None)
     if product_index is None:
         raise HTTPException(status_code=404, detail="商品不存在")
-    
-    # 保留原始創建時間
-    product_data["created_at"] = products[product_index].get("created_at", datetime.now().isoformat())
-    product_data["updated_at"] = datetime.now().isoformat()
-    product_data["id"] = product_id
-    
-    products[product_index] = product_data
+
+    existing = products[product_index]
+
+    # 僅允許修改特定欄位，庫存、成本及供應商不可變動
+    allowed_fields = {"name", "category", "sale_price", "description", "unit", "min_stock"}
+    for field in allowed_fields:
+        if field in product_data:
+            existing[field] = product_data[field]
+
+    existing["created_at"] = existing.get("created_at", datetime.now().isoformat())
+    existing["updated_at"] = datetime.now().isoformat()
+
+    products[product_index] = existing
     save_data("products", products)
     return {"message": "商品更新成功", "id": product_id}
 
 @app.delete("/api/products/{product_id}")
 async def delete_product(product_id: str):
-    products = load_data("products")
-    if not isinstance(products, list):
-        products = []
-    
-    product_index = next((i for i, p in enumerate(products) if p["id"] == product_id), None)
-    if product_index is None:
-        raise HTTPException(status_code=404, detail="商品不存在")
-    
-    # 檢查是否有關聯的銷售記錄
-    sales = load_data("sales") or []
-    if any(any(item.get("product_id") == product_id for item in sale.get("items", [])) for sale in sales):
-        raise HTTPException(status_code=400, detail="無法刪除，該商品已有銷售記錄")
-    
-    del products[product_index]
-    save_data("products", products)
-    return {"message": "商品刪除成功", "id": product_id}
+    """商品不可刪除"""
+    raise HTTPException(status_code=405, detail="商品不可刪除")
 
 # 銷售相關 API
 @app.get("/sales", response_class=HTMLResponse)
