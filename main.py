@@ -554,7 +554,13 @@ def update_inventory_for_purchase(purchase: Dict):
         # 找到對應的產品並更新庫存
         for product in products:
             if product["id"] == product_id:
-                product["stock"] = str(int(product.get("stock", 0)) + quantity)
+                # 庫存應維持為數值型態，避免後續計算出錯
+                current_stock = product.get("stock", 0)
+                try:
+                    current_stock = int(current_stock)
+                except (TypeError, ValueError):
+                    current_stock = 0
+                product["stock"] = current_stock + quantity
                 product["updated_at"] = datetime.now().isoformat()
                 updated = True
                 break
