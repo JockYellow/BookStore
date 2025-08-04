@@ -73,5 +73,16 @@
     "notes": "各類書籍批發",
     "created_at": "2025-05-20T13:45:00+08:00",
     "updated_at": "2025-07-22T10:30:00+08:00"
+  },
+  {
+    "name": "新增",
+    "contact_person": "新增人",
+    "phone": "0909090990",
+    "email": "service@123",
+    "address": "",
+    "payment_terms": "月結30天",
+    "notes": "",
+    "id": "S006",
+    "created_at": "2025-07-31T13:33:10.751223"
   }
 ]
