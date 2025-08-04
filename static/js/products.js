@@ -1,4 +1,4 @@
-// static/js/products.js - 完整商品管理功能
+// static/js/products.js 僅保留「編輯商品」功能
 
 document.addEventListener('DOMContentLoaded', () => {
     // DOM 元素
@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let allProducts = [];
     let suppliers = [];
 
-    /** 顯示商品 Modal */
+    /** 顯示商品 Modal（僅限編輯） */
     const showModal = (product) => {
         if (!product) return;
         productForm.reset();
@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch('/api/suppliers');
             if (res.ok) {
                 suppliers = await res.json();
-                const optionsHtml = suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+                const optionsHtml = suppliers.map(s => `<option value="\${s.id}">\${s.name}</option>`).join('');
                 supplierSelect.innerHTML = '<option value="">選擇供應商</option>' + optionsHtml;
                 supplierFilter.innerHTML = '<option value="">所有供應商</option>' + optionsHtml;
             }
@@ -87,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
     /** 渲染商品表格 */
     const renderTable = (products) => {
         if (products.length === 0) {
-            productsTableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4">沒有商品資料</td></tr>`;
+            productsTableBody.innerHTML = '<tr><td colspan="8" class="text-center py-4">沒有商品資料</td></tr>';
             return;
         }
 
@@ -103,19 +103,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 statusBadge = '庫存正常';
             }
             const supplierName = suppliers.find(s => s.id === product.supplier_id)?.name || '-';
-            return `
-                <tr data-id="${product.id}">
-                    <td>${product.name}</td>
-                    <td>${product.category || '-'}</td>
-                    <td>${supplierName}</td>
-                    <td>${product.purchase_price || 0}</td>
-                    <td>${product.sale_price || 0}</td>
-                    <td>${stock}</td>
-                    <td>${statusBadge}</td>
+            return \`
+                <tr data-id="\${product.id}">
+                    <td>\${product.name}</td>
+                    <td>\${product.category || '-'}</td>
+                    <td>\${supplierName}</td>
+                    <td>\${product.purchase_price || 0}</td>
+                    <td>\${product.sale_price || 0}</td>
+                    <td>\${stock}</td>
+                    <td>\${statusBadge}</td>
                     <td class="text-right text-sm font-medium">
                         <button class="edit-btn text-blue-600 hover:underline">編輯</button>
                     </td>
-                </tr>`;
+                </tr>\`;
         }).join('');
     };
 
@@ -127,7 +127,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const supplier = supplierFilter.value;
         let filtered = allProducts.filter(p => {
             const nameMatch = (p.name || '').toLowerCase().includes(searchText);
-            const matchSearch = nameMatch;
             const matchCategory = !category || p.category === category;
             const stock = parseInt(p.stock, 10) || 0;
             const min = parseInt(p.min_stock || p.minStock || 5, 10);
@@ -136,7 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (status === 'low_stock') statusMatch = stock > 0 && stock <= min;
             if (status === 'out_of_stock') statusMatch = stock <= 0;
             const supplierMatch = !supplier || p.supplier_id === supplier;
-            return matchSearch && matchCategory && statusMatch && supplierMatch;
+            return nameMatch && matchCategory && statusMatch && supplierMatch;
         });
         const sortValue = sortSelect.value;
         if (sortValue) {
@@ -160,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /** API：更新商品 */
     const updateProductApi = async (id, productData) => {
-        const res = await fetch(`/api/products/${id}`, {
+        const res = await fetch(\`/api/products/\${id}\`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(productData)
@@ -186,7 +185,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sale_price: parseFloat(formData.get('salePrice')) || 0,
             min_stock: parseInt(formData.get('minStock'), 10) || 0,
             unit: formData.get('unit').trim(),
-            description: formData.get('description').trim(),
+            description: formData.get('description').trim()
         };
 
         window.app.ui.showLoading('儲存中...');
@@ -203,25 +202,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    /** 處理表格中的點擊 (編輯/刪除) */
+    /** 處理表格中的點擊 (編輯) */
     const handleTableClick = (e) => {
         const target = e.target;
         const row = target.closest('tr');
         if (!row) return;
         const productId = row.dataset.id;
         const product = allProducts.find(p => p.id === productId);
-
         if (target.closest('.edit-btn')) {
             if (product) showModal(product);
         }
     };
 
-    // 事件監聽器
     cancelProductBtn.addEventListener('click', closeModal);
     saveProductBtn.addEventListener('click', handleFormSubmit);
     productsTableBody.addEventListener('click', handleTableClick);
 
-    // 初始化
     loadSuppliers();
     loadProducts();
 });
