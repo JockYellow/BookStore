@@ -377,6 +377,15 @@ async def create_sale(sale: dict):
         product["stock"] -= quantity
         product["updated_at"] = now.isoformat()
 
+    manual_type = sale.get("manual_discount_type")
+    manual_value = float(sale.get("manual_discount_value", 0) or 0)
+    manual_discount = 0.0
+    if manual_type == "percentage":
+        manual_discount = subtotal * (manual_value / 100)
+    elif manual_type == "amount":
+        manual_discount = manual_value
+    discount_total += manual_discount
+
     total = subtotal - discount_total
     amount_received = float(sale.get("amount_received", total))
     if amount_received < total:
@@ -392,6 +401,8 @@ async def create_sale(sale: dict):
         "payment_method": sale.get("payment_method", "cash"),
         "amount_received": amount_received,
         "change": amount_received - total,
+        "manual_discount_type": manual_type,
+        "manual_discount_value": manual_value,
         "created_at": now.isoformat(),
         "cashier": sale.get("cashier", "系統管理員")
     }
