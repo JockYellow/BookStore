@@ -1,4 +1,4 @@
-// static/js/sales.js (修改後，支援會員折扣、找零與付款方式)
+// static/js/sales.js (修改後，支援會員折扣與找零)
 
 document.addEventListener('DOMContentLoaded', function() {
     // DOM 元素
@@ -16,8 +16,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const memberInfo = document.getElementById('member-info');
     const newSaleBtn = document.getElementById('new-sale-btn');
 
-    // 新增付款與找零相關元素
-    const paymentSelect = document.getElementById('payment-method');
+    // 會員相關元素與找零
+    const memberList = document.getElementById('member-list');
+    const memberModal = document.getElementById('member-modal');
+    const memberSearch = document.getElementById('member-search');
+    const nonMemberBtn = document.getElementById('non-member-btn');
     const amountReceivedInput = document.getElementById('amount-received');
     const changeDisplay = document.getElementById('change-display');
     const calcChangeBtn = document.getElementById('calc-change-btn');
@@ -65,6 +68,26 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     // 載入會員資料
+    const renderMemberList = (list) => {
+        if (!memberList) return;
+        memberList.innerHTML = list.map(m => `
+            <li class="py-3 px-2 hover:bg-gray-50 cursor-pointer" data-id="${m.id}">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                        <span class="text-blue-600 font-medium">${(m.name || m.id).charAt(0)}</span>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-900">${m.name || m.id}</p>
+                        <p class="text-sm text-gray-500">${m.phone || ''}</p>
+                    </div>
+                    <div class="ml-auto text-sm text-gray-500">
+                        累積 ${(m.total_spent || 0).toLocaleString()} 元
+                    </div>
+                </div>
+            </li>
+        `).join('');
+    };
+
     const loadMembers = async () => {
         try {
             const response = await fetch('/api/members');
@@ -75,6 +98,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     memberSelect.innerHTML = '<option value="">非會員顧客</option>' +
                         members.map(m => `<option value="${m.id}">${m.name || m.id}</option>`).join('');
                 }
+                renderMemberList(members);
             }
         } catch (error) {
             console.warn('載入會員資料失敗:', error);
@@ -211,7 +235,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         const total = subtotal - memberDiscount - manualDiscount;
 
-        const paymentMethod = paymentSelect ? paymentSelect.value : 'cash';
         const received = amountReceivedInput && amountReceivedInput.value ? parseFloat(amountReceivedInput.value) : total;
         const change = received - total;
 
@@ -226,7 +249,6 @@ document.addEventListener('DOMContentLoaded', function() {
             discount: memberDiscount + manualDiscount,
             manual_discount_type: discType || null,
             manual_discount_value: discVal,
-            payment_method: paymentMethod,
             amount_received: received,
             change: change,
             member_id: selectedMember ? selectedMember.id : null
@@ -283,6 +305,50 @@ document.addEventListener('DOMContentLoaded', function() {
                 const val = memberSelect.value;
                 selectedMember = members.find(m => m.id === val) || null;
                 updateCartUI();
+            });
+        }
+        if (memberList) {
+            memberList.addEventListener('click', (e) => {
+                const li = e.target.closest('li[data-id]');
+                if (li) {
+                    const id = li.dataset.id;
+                    selectedMember = members.find(m => m.id === id) || null;
+                    if (memberSelect) memberSelect.value = id;
+                    updateCartUI();
+                    if (memberModal) {
+                        memberModal.classList.add('hidden');
+                        document.body.classList.remove('overflow-hidden');
+                    }
+                }
+            });
+        }
+        if (memberSearch) {
+            memberSearch.addEventListener('input', () => {
+                const term = memberSearch.value.trim().toLowerCase();
+                const filtered = members.filter(m =>
+                    (m.name || '').toLowerCase().includes(term) ||
+                    (m.phone || '').toLowerCase().includes(term)
+                );
+                renderMemberList(filtered);
+            });
+        }
+        document.querySelectorAll('.close-member-modal-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (memberModal) {
+                    memberModal.classList.add('hidden');
+                    document.body.classList.remove('overflow-hidden');
+                }
+            });
+        });
+        if (nonMemberBtn) {
+            nonMemberBtn.addEventListener('click', () => {
+                selectedMember = null;
+                if (memberSelect) memberSelect.value = '';
+                updateCartUI();
+                if (memberModal) {
+                    memberModal.classList.add('hidden');
+                    document.body.classList.remove('overflow-hidden');
+                }
             });
         }
         if (newSaleBtn) {
@@ -345,9 +411,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const received = parseFloat(amountReceivedInput.value);
             if (!isNaN(received) && received >= total) {
                 const changeVal = received - total;
-                changeDisplay.textContent = `$${changeVal.toLocaleString()}`;
+                changeDisplay.value = changeVal.toLocaleString();
             } else {
-                changeDisplay.textContent = '$0';
+                changeDisplay.value = '0';
             }
         };
 
