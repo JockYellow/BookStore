@@ -36,10 +36,6 @@
                         </div>
                         <select id="category-filter" class="block w-full sm:w-auto pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
                             <option value="">所有分類</option>
-                            <option value="book">書籍</option>
-                            <option value="stationery">文具</option>
-                            <option value="gift">禮品</option>
-                            <option value="other">其他</option>
                         </select>
                     </div>
                 </div>
@@ -314,12 +310,16 @@
                                     <span class="text-gray-600">會員折扣</span>
                                     <span id="member-discount">-$0</span>
                                 </div>
+                                <div class="flex justify-between text-sm mt-1">
+                                    <span class="text-gray-600">額外折扣</span>
+                                    <span id="manual-discount">-$0</span>
+                                </div>
                                 <div class="flex justify-between font-medium mt-2 pt-2 border-t border-gray-200">
                                     <span>總計</span>
                                     <span id="checkout-total" class="text-lg text-blue-600">$0</span>
                                 </div>
                             </div>
-                            
+
                             <div class="mt-6">
                                 <div class="grid grid-cols-2 gap-4">
                                     <div>
@@ -341,7 +341,22 @@
                                         </div>
                                     </div>
                                 </div>
-                                
+
+                                <div class="mt-4 grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label for="discount-type" class="block text-sm font-medium text-gray-700 mb-1">折扣類型</label>
+                                        <select id="discount-type" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                                            <option value="">無</option>
+                                            <option value="percentage">百分比</option>
+                                            <option value="amount">金額折抵</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="discount-value" class="block text-sm font-medium text-gray-700 mb-1">折扣值</label>
+                                        <input type="number" id="discount-value" class="focus:ring-blue-500 focus:border-blue-500 block w-full pl-2 pr-2 sm:text-sm border-gray-300 rounded-md" value="0" min="0">
+                                    </div>
+                                </div>
+
                                 <div class="mt-4 grid grid-cols-2 gap-4">
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-1">找零</label>
@@ -409,7 +424,7 @@
                 <span id="receipt-subtotal">$0</span>
             </div>
             <div class="flex justify-between text-sm py-1">
-                <span>會員折扣:</span>
+                <span>折扣:</span>
                 <span id="receipt-discount">-$0</span>
             </div>
             <div class="flex justify-between font-medium py-1">

@@ -22,6 +22,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const changeDisplay = document.getElementById('change-display');
     const calcChangeBtn = document.getElementById('calc-change-btn');
     const memberDiscountDisplay = document.getElementById('member-discount');
+    const discountType = document.getElementById('discount-type');
+    const discountValue = document.getElementById('discount-value');
+    const manualDiscountDisplay = document.getElementById('manual-discount');
 
     // 全域變數
     let allProducts = [];
@@ -35,6 +38,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             await loadProducts();
             await loadMembers();
+            populateCategories();
             renderProductGrid(allProducts);
             setupEventListeners();
             updateCartUI();
@@ -53,12 +57,20 @@ document.addEventListener('DOMContentLoaded', function() {
         allProducts = await response.json();
     };
 
+    const populateCategories = () => {
+        if (!categoryFilter) return;
+        const cats = Array.from(new Set(allProducts.map(p => p.category).filter(Boolean)));
+        categoryFilter.innerHTML = '<option value="">所有分類</option>' +
+            cats.map(c => `<option value="${c}">${c}</option>`).join('');
+    };
+
     // 載入會員資料
     const loadMembers = async () => {
         try {
             const response = await fetch('/api/members');
             if (response.ok) {
-                members = await response.json();
+                const data = await response.json();
+                members = Array.isArray(data) ? data : (data.data || []);
                 if (memberSelect) {
                     memberSelect.innerHTML = '<option value="">非會員顧客</option>' +
                         members.map(m => `<option value="${m.id}">${m.name || m.id}</option>`).join('');
@@ -185,11 +197,19 @@ document.addEventListener('DOMContentLoaded', function() {
     // 處理結帳流程
     const processCheckout = async () => {
         const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
-        let discount = 0;
+        let memberDiscount = 0;
         if (selectedMember && selectedMember.discount_rate) {
-            discount = subtotal * selectedMember.discount_rate;
+            memberDiscount = subtotal * selectedMember.discount_rate;
         }
-        const total = subtotal - discount;
+        let manualDiscount = 0;
+        const discType = discountType ? discountType.value : '';
+        const discVal = discountValue ? parseFloat(discountValue.value) || 0 : 0;
+        if (discType === 'percentage') {
+            manualDiscount = subtotal * (discVal / 100);
+        } else if (discType === 'amount') {
+            manualDiscount = discVal;
+        }
+        const total = subtotal - memberDiscount - manualDiscount;
 
         const paymentMethod = paymentSelect ? paymentSelect.value : 'cash';
         const received = amountReceivedInput && amountReceivedInput.value ? parseFloat(amountReceivedInput.value) : total;
@@ -203,6 +223,9 @@ document.addEventListener('DOMContentLoaded', function() {
             })),
             total: total,
             subtotal: subtotal,
+            discount: memberDiscount + manualDiscount,
+            manual_discount_type: discType || null,
+            manual_discount_value: discVal,
             payment_method: paymentMethod,
             amount_received: received,
             change: change,
@@ -223,9 +246,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             window.app.ui.showNotification('success', '結帳成功！');
             await loadProducts();
+            populateCategories();
             filterProducts();
             cart = []; // 清空購物車
             selectedMember = null;
+            if (discountType) discountType.value = '';
+            if (discountValue) discountValue.value = 0;
             updateCartUI();
             checkoutModal.classList.add('hidden'); // 關閉結帳視窗
             document.body.classList.remove('overflow-hidden');
@@ -284,12 +310,12 @@ document.addEventListener('DOMContentLoaded', function() {
             if (selectedMember && selectedMember.discount_rate) {
                 discount = subtotal * selectedMember.discount_rate;
             }
-            const total = subtotal - discount;
-            document.getElementById('checkout-total').textContent = `$${total.toLocaleString()}`;
             document.getElementById('checkout-subtotal').textContent = `$${subtotal.toLocaleString()}`;
-            if (memberDiscountDisplay) {
-                memberDiscountDisplay.textContent = `-$${discount.toLocaleString()}`;
-            }
+            memberDiscountDisplay.textContent = `-$${discount.toLocaleString()}`;
+            if (manualDiscountDisplay) manualDiscountDisplay.textContent = '-$0';
+            if (discountType) discountType.value = '';
+            if (discountValue) discountValue.value = 0;
+            document.getElementById('checkout-total').textContent = `$${(subtotal - discount).toLocaleString()}`;
             const checkoutItems = document.getElementById('checkout-items');
             checkoutItems.innerHTML = cart.map(item => `
                 <tr>
@@ -299,6 +325,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <td>$${(item.price * item.quantity).toLocaleString()}</td>
                 </tr>
             `).join('');
+            updateCheckoutSummary();
             checkoutModal.classList.remove('hidden');
             document.body.classList.add('overflow-hidden');
         });
@@ -312,19 +339,48 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
 
-        // 計算找零按鈕
-        if (calcChangeBtn && amountReceivedInput && changeDisplay) {
-            calcChangeBtn.addEventListener('click', () => {
-                const totalText = document.getElementById('checkout-total')?.textContent || '0';
-                const total = parseFloat(totalText.replace(/[$,]/g, ''));
-                const received = parseFloat(amountReceivedInput.value);
-                if (isNaN(received) || received < total) {
-                    window.app.ui.showNotification('error', '實收金額不足');
-                    return;
-                }
+        const calculateChange = () => {
+            const totalText = document.getElementById('checkout-total')?.textContent || '0';
+            const total = parseFloat(totalText.replace(/[$,]/g, '')) || 0;
+            const received = parseFloat(amountReceivedInput.value);
+            if (!isNaN(received) && received >= total) {
                 const changeVal = received - total;
                 changeDisplay.textContent = `$${changeVal.toLocaleString()}`;
-            });
+            } else {
+                changeDisplay.textContent = '$0';
+            }
+        };
+
+        const updateCheckoutSummary = () => {
+            const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+            let discount = 0;
+            if (selectedMember && selectedMember.discount_rate) {
+                discount = subtotal * selectedMember.discount_rate;
+            }
+            let manual = 0;
+            const dt = discountType ? discountType.value : '';
+            const dv = discountValue ? parseFloat(discountValue.value) || 0 : 0;
+            if (dt === 'percentage') manual = subtotal * (dv / 100);
+            else if (dt === 'amount') manual = dv;
+            const total = subtotal - discount - manual;
+            document.getElementById('checkout-subtotal').textContent = `$${subtotal.toLocaleString()}`;
+            memberDiscountDisplay.textContent = `-$${discount.toLocaleString()}`;
+            manualDiscountDisplay.textContent = `-$${manual.toLocaleString()}`;
+            document.getElementById('checkout-total').textContent = `$${total.toLocaleString()}`;
+            calculateChange();
+        };
+
+        if (discountType) {
+            discountType.addEventListener('change', updateCheckoutSummary);
+        }
+        if (discountValue) {
+            discountValue.addEventListener('input', updateCheckoutSummary);
+        }
+
+        // 計算找零
+        if (calcChangeBtn && amountReceivedInput && changeDisplay) {
+            calcChangeBtn.addEventListener('click', calculateChange);
+            amountReceivedInput.addEventListener('input', calculateChange);
         }
     };
 

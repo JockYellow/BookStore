@@ -25,6 +25,30 @@
         </div>
     </div>
 </div>
+
+<!-- 銷售明細 Modal -->
+<div id="sale-detail-modal" class="fixed inset-0 z-10 hidden" aria-modal="true" role="dialog">
+    <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75"></div>
+        <div class="bg-white rounded-lg overflow-hidden shadow-xl max-w-xl w-full z-10">
+            <div class="p-4">
+                <div class="flex justify-between items-start">
+                    <h3 class="text-lg font-medium text-gray-900">銷售明細</h3>
+                    <button id="close-sale-detail" class="text-gray-400 hover:text-gray-500">
+                        <span class="sr-only">關閉</span>
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="sale-detail-content" class="mt-4 text-sm text-gray-700">
+                    <!-- 明細內容動態載入 -->
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 text-right">
+                <button id="sale-detail-close-btn" class="inline-flex justify-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">關閉</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
