@@ -297,6 +297,14 @@ async def sales_page(request: Request):
         "title": "銷售管理"
     })
 
+# 銷售記錄頁面
+@app.get("/sales/history", response_class=HTMLResponse)
+async def sales_history_page(request: Request):
+    return templates.TemplateResponse("sales_history.html", {
+        "request": request,
+        "title": "銷售記錄"
+    })
+
 @app.get("/api/sales")
 async def get_sales():
     sales_data = load_data("sales")
@@ -304,6 +312,14 @@ async def get_sales():
     if isinstance(sales_data, dict) and 'sales' in sales_data:
         return sales_data['sales']
     return sales_data or []
+
+@app.get("/api/sales/{sale_id}")
+async def get_sale(sale_id: str):
+    sales = load_data("sales")
+    sale = next((s for s in sales if s.get("id") == sale_id), None)
+    if not sale:
+        raise HTTPException(status_code=404, detail="銷售記錄不存在")
+    return sale
 
 @app.post("/api/sales")
 async def create_sale(sale: dict):
@@ -348,16 +364,23 @@ async def create_sale(sale: dict):
         if not product:
             continue
         quantity = int(item.get("quantity", 0))
-        unit_price = float(item.get("unit_price", product.get("selling_price", 0)))
+        # 取得商品售價
+        unit_price = float(item.get("unit_price", product.get("sale_price", 0)))
+
+        # 庫存檢查，避免負數
+        if product.get("stock", 0) < quantity:
+            raise HTTPException(status_code=400, detail=f"商品 {product.get('name')} 庫存不足")
+
         subtotal += unit_price * quantity
         discount_total += calc_discount(product["id"], quantity, unit_price)
 
         product["stock"] -= quantity
-        if product["stock"] < 0:
-            product["stock"] = 0
+        product["updated_at"] = now.isoformat()
 
     total = subtotal - discount_total
     amount_received = float(sale.get("amount_received", total))
+    if amount_received < total:
+        raise HTTPException(status_code=400, detail="實收金額不足")
 
     sale_data = {
         "id": sale_id,

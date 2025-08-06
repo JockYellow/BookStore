@@ -7,8 +7,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const cartCount = document.getElementById('cart-count');
     const subtotalElement = document.getElementById('subtotal');
     const totalAmount = document.getElementById('total-amount');
+    const discountAmount = document.getElementById('discount-amount');
     const checkoutBtn = document.getElementById('checkout-btn');
     const checkoutModal = document.getElementById('checkout-modal');
+    const productSearch = document.getElementById('product-search');
+    const categoryFilter = document.getElementById('category-filter');
+    const memberSelect = document.getElementById('member-select');
+    const memberInfo = document.getElementById('member-info');
+    const newSaleBtn = document.getElementById('new-sale-btn');
 
     // 新增付款與找零相關元素
     const paymentSelect = document.getElementById('payment-method');
@@ -53,32 +59,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const response = await fetch('/api/members');
             if (response.ok) {
                 members = await response.json();
+                if (memberSelect) {
+                    memberSelect.innerHTML = '<option value="">非會員顧客</option>' +
+                        members.map(m => `<option value="${m.id}">${m.name || m.id}</option>`).join('');
+                }
             }
         } catch (error) {
             console.warn('載入會員資料失敗:', error);
         }
-    };
-
-    // 選擇會員（簡易提示方式）
-    const promptMember = async () => {
-        if (!members || members.length === 0) {
-            await loadMembers();
-        }
-        const input = prompt('輸入會員電話或編號（留空代表非會員）:');
-        if (!input) {
-            selectedMember = null;
-            updateCartUI();
-            return;
-        }
-        const found = members.find(m => m.id === input || m.phone === input);
-        if (found) {
-            selectedMember = found;
-            window.app.ui.showNotification('success', `已套用會員：${found.name || found.id}`);
-        } else {
-            window.app.ui.showNotification('error', '找不到該會員，將以非會員計算');
-            selectedMember = null;
-        }
-        updateCartUI();
     };
 
     // 渲染商品列表
@@ -143,11 +131,55 @@ document.addEventListener('DOMContentLoaded', function() {
 
         subtotalElement.textContent = `$${subtotal.toLocaleString()}`;
         totalAmount.textContent = `$${total.toLocaleString()}`;
+        if (discountAmount) {
+            discountAmount.textContent = `-$${discount.toLocaleString()}`;
+        }
         if (memberDiscountDisplay) {
             memberDiscountDisplay.textContent = `-$${discount.toLocaleString()}`;
         }
+        if (memberInfo) {
+            if (selectedMember) {
+                memberInfo.innerHTML = `
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                            <i class="fas fa-user text-blue-500"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-gray-900">${selectedMember.name || selectedMember.id}</p>
+                            <p class="text-xs text-gray-500">${selectedMember.phone || ''}</p>
+                        </div>
+                    </div>`;
+            } else {
+                memberInfo.innerHTML = `
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+                            <i class="fas fa-user text-gray-400"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-gray-900">非會員顧客</p>
+                            <p class="text-xs text-gray-500">無會員折扣</p>
+                        </div>
+                    </div>`;
+            }
+        }
         cartCount.textContent = `${cart.length} 項商品`;
         checkoutBtn.disabled = cart.length === 0;
+    };
+
+    const filterProducts = () => {
+        let filtered = [...allProducts];
+        const search = productSearch ? productSearch.value.trim().toLowerCase() : '';
+        const category = categoryFilter ? categoryFilter.value : '';
+        if (search) {
+            filtered = filtered.filter(p =>
+                p.name.toLowerCase().includes(search) ||
+                (p.id && p.id.toLowerCase().includes(search))
+            );
+        }
+        if (category) {
+            filtered = filtered.filter(p => p.category === category);
+        }
+        renderProductGrid(filtered);
     };
 
     // 處理結帳流程
@@ -190,6 +222,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw new Error(err.detail || '結帳失敗');
             }
             window.app.ui.showNotification('success', '結帳成功！');
+            await loadProducts();
+            filterProducts();
             cart = []; // 清空購物車
             selectedMember = null;
             updateCartUI();
@@ -212,6 +246,28 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
+        if (productSearch) {
+            productSearch.addEventListener('input', filterProducts);
+        }
+        if (categoryFilter) {
+            categoryFilter.addEventListener('change', filterProducts);
+        }
+        if (memberSelect) {
+            memberSelect.addEventListener('change', () => {
+                const val = memberSelect.value;
+                selectedMember = members.find(m => m.id === val) || null;
+                updateCartUI();
+            });
+        }
+        if (newSaleBtn) {
+            newSaleBtn.addEventListener('click', () => {
+                cart = [];
+                selectedMember = null;
+                if (memberSelect) memberSelect.value = '';
+                updateCartUI();
+            });
+        }
+
         cartItems.addEventListener('click', (e) => {
             const removeBtn = e.target.closest('.remove-item');
             if (removeBtn) {
@@ -222,9 +278,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         checkoutBtn.addEventListener('click', async () => {
-            // 在開啟結帳視窗前詢問會員
-            await promptMember();
-
             // 填充結帳 Modal
             const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
             let discount = 0;
@@ -234,6 +287,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const total = subtotal - discount;
             document.getElementById('checkout-total').textContent = `$${total.toLocaleString()}`;
             document.getElementById('checkout-subtotal').textContent = `$${subtotal.toLocaleString()}`;
+            if (memberDiscountDisplay) {
+                memberDiscountDisplay.textContent = `-$${discount.toLocaleString()}`;
+            }
             const checkoutItems = document.getElementById('checkout-items');
             checkoutItems.innerHTML = cart.map(item => `
                 <tr>
@@ -259,7 +315,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // 計算找零按鈕
         if (calcChangeBtn && amountReceivedInput && changeDisplay) {
             calcChangeBtn.addEventListener('click', () => {
-                const total = parseFloat(totalAmount.textContent.replace(/[$,]/g, ''));
+                const totalText = document.getElementById('checkout-total')?.textContent || '0';
+                const total = parseFloat(totalText.replace(/[$,]/g, ''));
                 const received = parseFloat(amountReceivedInput.value);
                 if (isNaN(received) || received < total) {
                     window.app.ui.showNotification('error', '實收金額不足');
