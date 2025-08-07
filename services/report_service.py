@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional
 from collections import defaultdict
+import pandas as pd
 from .base_service import BaseService
 from .product_service import ProductService
 from .sale_service import SaleService
@@ -18,6 +19,14 @@ class ReportService:
         self.purchase_service = PurchaseService(data_dir)
         self.supplier_service = SupplierService(data_dir)
         self.member_service = MemberService(data_dir)
+
+    def _normalize_dates(self, start_date: Optional[str], end_date: Optional[str]) -> tuple[str, str]:
+        """Return normalized (start_date, end_date) using recent 30 days as default."""
+        if not end_date:
+            end_date = datetime.now().strftime('%Y-%m-%d')
+        if not start_date:
+            start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+        return start_date, end_date
     
     def get_sales_report(self, start_date: str = None, end_date: str = None) -> Dict:
         """
@@ -26,11 +35,7 @@ class ReportService:
         :param end_date: 結束日期 (YYYY-MM-DD)
         :return: 銷售報表數據
         """
-        # 設置默認日期範圍（最近30天）
-        if not end_date:
-            end_date = datetime.now().strftime('%Y-%m-%d')
-        if not start_date:
-            start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+        start_date, end_date = self._normalize_dates(start_date, end_date)
         
         # 獲取銷售記錄
         sales = []
@@ -42,30 +47,38 @@ class ReportService:
         
         # 計算銷售統計
         total_sales = len(sales)
-        total_amount = sum(sale.get('final_amount', 0) for sale in sales)
-        total_discount = sum(sale.get('discount_amount', 0) for sale in sales)
+        total_amount = sum(sale.get('total_amount', sale.get('final_amount', 0)) for sale in sales)
+        total_discount = sum(sale.get('discount', sale.get('discount_amount', 0)) for sale in sales)
         
         # 按日期分組
         daily_sales = defaultdict(float)
         for sale in sales:
             sale_date = sale.get('sale_date', '').split('T')[0]
-            daily_sales[sale_date] += sale.get('final_amount', 0)
+            daily_sales[sale_date] += sale.get('total_amount', sale.get('final_amount', 0))
         
         # 按商品分類統計
         category_sales = defaultdict(float)
         product_sales = defaultdict(float)
         
         for sale in sales:
-            sale_id = sale['id']
-            sale_details = self.sale_service.get_sale_details(sale_id)
-            
-            for item in sale_details.get('items', []):
+            items = sale.get('items')
+            if items is None:
+                items = self.sale_service.sale_items.query(sale_id=sale['id'])
+            for item in items:
                 product_id = item.get('product_id')
                 product = self.product_service.get(product_id)
+                amount = item.get(
+                    'total_price',
+                    item.get('subtotal', item.get('quantity', 0) * item.get('unit_price', 0) - item.get('discount', 0))
+                )
                 if product:
                     category = product.get('category', '未分類')
-                    category_sales[category] += item.get('total_price', 0)
-                    product_sales[product.get('name')] += item.get('total_price', 0)
+                    name = product.get('name')
+                else:
+                    category = '未分類'
+                    name = product_id
+                category_sales[category] += amount
+                product_sales[name] += amount
         
         # 獲取最暢銷商品（按銷售額）
         top_products = sorted(
@@ -86,6 +99,80 @@ class ReportService:
             'category_sales': dict(category_sales),
             'top_products': top_products
         }
+
+    def get_product_sales_summary(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[Dict]:
+        """Aggregate product sales between dates."""
+        start_date, end_date = self._normalize_dates(start_date, end_date)
+        summary: Dict[str, Dict] = {}
+        for sale in self.sale_service.get_all():
+            sale_date = sale.get('sale_date', '').split('T')[0]
+            if start_date <= sale_date <= end_date:
+                items = sale.get('items')
+                if items is None:
+                    items = self.sale_service.sale_items.query(sale_id=sale['id'])
+                for item in items:
+                    pid = item['product_id']
+                    product = self.product_service.get(pid)
+                    if pid not in summary:
+                        summary[pid] = {
+                            'product_id': pid,
+                            'product_name': product.get('name', '未知商品') if product else '未知商品',
+                            'quantity': 0,
+                            'amount': 0.0,
+                        }
+                    summary[pid]['quantity'] += item.get('quantity', 0)
+                    summary[pid]['amount'] += item.get(
+                        'total_price',
+                        item.get('subtotal', item.get('quantity', 0) * item.get('unit_price', 0) - item.get('discount', 0.0))
+                    )
+        return list(summary.values())
+
+    def get_supplier_purchase_summary(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[Dict]:
+        """Summarize purchases grouped by supplier within the date range."""
+        start_date, end_date = self._normalize_dates(start_date, end_date)
+        summary: Dict[str, Dict] = {}
+        for purchase in self.purchase_service.get_all():
+            purchase_date = purchase.get('purchase_date', '').split('T')[0]
+            if start_date <= purchase_date <= end_date:
+                sid = purchase.get('supplier_id')
+                supplier = self.supplier_service.get(sid)
+                if sid not in summary:
+                    summary[sid] = {
+                        'supplier_id': sid,
+                        'supplier_name': supplier.get('name', '未知供應商') if supplier else '未知供應商',
+                        'total_amount': 0.0,
+                        'purchase_count': 0,
+                    }
+                amount = purchase.get('total_amount', purchase.get('total', 0.0))
+                summary[sid]['total_amount'] += amount
+                summary[sid]['purchase_count'] += 1
+        return list(summary.values())
+
+    def get_sales_transactions(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[Dict]:
+        """Return sales transactions within the period."""
+        start_date, end_date = self._normalize_dates(start_date, end_date)
+        transactions = []
+        for sale in self.sale_service.get_all():
+            sale_date = sale.get('sale_date', '').split('T')[0]
+            if start_date <= sale_date <= end_date:
+                transactions.append(sale)
+        return transactions
+
+    def get_purchase_records(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[Dict]:
+        """Return purchase records within the period."""
+        start_date, end_date = self._normalize_dates(start_date, end_date)
+        records = []
+        for purchase in self.purchase_service.get_all():
+            purchase_date = purchase.get('purchase_date', '').split('T')[0]
+            if start_date <= purchase_date <= end_date:
+                records.append(purchase)
+        return records
+
+    def export_to_excel(self, data: List[Dict], file_path: str) -> str:
+        """Export list of dictionaries to an Excel file and return the file path."""
+        df = pd.DataFrame(data)
+        df.to_excel(file_path, index=False)
+        return file_path
     
     def get_inventory_report(self) -> Dict:
         """
@@ -95,19 +182,19 @@ class ReportService:
         products = self.product_service.get_all()
         
         # 計算庫存總值
-        total_value = sum(p.get('stock', 0) * p.get('cost_price', 0) for p in products)
+        total_value = sum(p.get('stock', 0) * p.get('purchase_price', p.get('cost_price', 0)) for p in products)
         
         # 按分類統計
         category_inventory = defaultdict(lambda: {'count': 0, 'value': 0.0})
         for product in products:
             category = product.get('category', '未分類')
             category_inventory[category]['count'] += 1
-            category_inventory[category]['value'] += product.get('stock', 0) * product.get('cost_price', 0)
+            category_inventory[category]['value'] += product.get('stock', 0) * product.get('purchase_price', product.get('cost_price', 0))
         
         # 低庫存商品
         low_stock_products = [
             p for p in products 
-            if p.get('stock', 0) <= p.get('reorder_level', 5)  # 默認再訂購點為5
+            if p.get('stock', 0) <= p.get('reorder_level', p.get('min_stock', 5))  # 默認再訂購點為5
         ]
         
         return {
@@ -119,7 +206,7 @@ class ReportService:
                     'id': p['id'],
                     'name': p.get('name'),
                     'stock': p.get('stock', 0),
-                    'reorder_level': p.get('reorder_level', 5)
+                    'reorder_level': p.get('reorder_level', p.get('min_stock', 5))
                 }
                 for p in low_stock_products
             ]
