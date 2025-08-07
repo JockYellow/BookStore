@@ -1,13 +1,5 @@
 # 忽略資料夾
-Parquet_data/
-raw_data/
-__pycache__/
+**/__pycache__/
 .ipynb_checkpoints/
 *.pyc
-*.pkl
-*.parquet
-*.xlsx
-*.csv
-.DS_Store
-TOjinja/oneflow/html/
-TOjinja/oneflow/json/
+ai_exports/
