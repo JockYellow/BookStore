@@ -1,0 +1,2561 @@
+
+
+===== docs\static\js\purchase_form.js =====
+// static/js/purchase_form.js (全新內容)
+
+document.addEventListener('DOMContentLoaded', function() {
+    // DOM 元素
+    const form = document.getElementById('purchase-form');
+    const supplierSelect = document.getElementById('supplier');
+    const itemsContainer = document.getElementById('items-container');
+    const addItemBtn = document.getElementById('add-item');
+    const itemTemplate = document.getElementById('item-template');
+    
+    let allProducts = [];
+    let itemCounter = 1;
+
+    // 初始化
+    const init = async () => {
+        window.app.ui.showLoading('載入頁面資料...');
+        try {
+            await Promise.all([loadSuppliers(), loadProducts()]);
+            // 初始時，為第一個商品選項填充內容
+            populateProductOptions(document.querySelector('.product-select'));
+        } catch (error) {
+            console.error('初始化失敗:', error);
+            window.app.ui.showNotification('error', '頁面資料載入失敗');
+        } finally {
+            window.app.ui.hideLoading();
+        }
+    };
+
+    // 載入供應商
+    const loadSuppliers = async () => {
+        const response = await fetch('./data/suppliers.json');
+        if (!response.ok) throw new Error('無法載入供應商');
+        const suppliers = await response.json();
+        suppliers.forEach(supplier => {
+            const option = document.createElement('option');
+            option.value = supplier.id;
+            option.textContent = supplier.name;
+            supplierSelect.appendChild(option);
+        });
+    };
+
+    // 載入商品
+    const loadProducts = async () => {
+        const response = await fetch('./data/products.json');
+        if (!response.ok) throw new Error('無法載入商品');
+        allProducts = await response.json();
+    };
+    
+    // 填充商品下拉選項
+    const populateProductOptions = (selectElement) => {
+        allProducts.forEach(product => {
+            const option = document.createElement('option');
+            option.value = product.id;
+            option.textContent = `${product.name} (售價: $${product.sale_price})`;
+            // 將成本價存在 data attribute 中，方便自動帶入
+            option.dataset.cost = product.purchase_price || 0;
+            selectElement.appendChild(option);
+        });
+    };
+    
+    // 新增一筆商品項目
+    const addNewItem = () => {
+        const newItemFragment = itemTemplate.content.cloneNode(true);
+        const newItemRow = newItemFragment.querySelector('.item-row');
+        
+        // 更新 name 屬性中的索引，確保後端能正確解析
+        newItemRow.querySelectorAll('[name]').forEach(input => {
+            input.name = input.name.replace(/\[\d+\]/, `[${itemCounter}]`);
+        });
+        itemCounter++;
+
+        populateProductOptions(newItemRow.querySelector('.product-select'));
+        itemsContainer.appendChild(newItemRow);
+    };
+
+    // 計算總金額
+    const calculateTotals = () => {
+        let subtotal = 0;
+        itemsContainer.querySelectorAll('.item-row').forEach(row => {
+            const quantity = parseFloat(row.querySelector('.quantity-input').value) || 0;
+            const price = parseFloat(row.querySelector('.price-input').value) || 0;
+            subtotal += quantity * price;
+        });
+
+        const shippingFee = parseFloat(document.getElementById('shipping-fee').value) || 0;
+        const taxRate = (parseFloat(document.getElementById('tax-rate').value) || 0) / 100;
+        const tax = subtotal * taxRate;
+        const total = subtotal + shippingFee + tax;
+
+        document.getElementById('subtotal').textContent = `$${subtotal.toFixed(2)}`;
+        document.getElementById('shipping-total').textContent = `$${shippingFee.toFixed(2)}`;
+        document.getElementById('tax-amount').textContent = `$${tax.toFixed(2)}`;
+        document.getElementById('total-amount').textContent = `$${total.toFixed(2)}`;
+    };
+
+    // 處理表單提交
+    const handleFormSubmit = (e) => {
+        e.preventDefault();
+        
+        const items = [];
+        document.querySelectorAll('.item-row').forEach(row => {
+            const productId = row.querySelector('.product-select').value;
+            if (productId) {
+                items.push({
+                    product_id: productId,
+                    quantity: parseInt(row.querySelector('.quantity-input').value, 10),
+                    unit_price: parseFloat(row.querySelector('.price-input').value)
+                });
+            }
+        });
+
+        if (!supplierSelect.value) {
+            window.app.ui.showNotification('error', '請選擇一個供應商');
+            return;
+        }
+        if (items.length === 0) {
+            window.app.ui.showNotification('error', '請至少新增一項商品');
+            return;
+        }
+
+        const purchaseData = {
+            supplier_id: supplierSelect.value,
+            purchase_date: document.getElementById('purchase-date').value,
+            expected_delivery_date: document.getElementById('expected-delivery-date').value,
+            shipping_cost: parseFloat(document.getElementById('shipping-fee').value) || 0,
+            tax_rate: parseFloat(document.getElementById('tax-rate').value) || 0,
+            payment_status: document.getElementById('payment-status').value,
+            notes: document.getElementById('notes').value,
+            status: 'ordered', // 或根據需求設定
+            items: items
+        };
+
+        window.app.ui.showLoading('正在儲存進貨單...');
+        try {
+            const response = await fetch('./data/purchases.json', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(purchaseData)
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.detail || '儲存失敗');
+            }
+            
+            window.app.ui.showNotification('success', '進貨單已成功建立！');
+            // 延遲1.5秒後跳轉回列表頁
+            setTimeout(() => {
+                window.location.href = '/purchases';
+            }, 1500);
+
+        } catch (error) {
+            console.error('儲存失敗:', error);
+            window.app.ui.showNotification('error', error.message);
+        } finally {
+            window.app.ui.hideLoading();
+        }
+    };
+    
+    // 設定事件監聽
+    addItemBtn.addEventListener('click', addNewItem);
+    form.addEventListener('submit', handleFormSubmit);
+
+    // 動態綁定事件
+    itemsContainer.addEventListener('click', (e) => {
+        if (e.target.closest('.remove-item')) {
+            if (itemsContainer.querySelectorAll('.item-row').length > 1) {
+                e.target.closest('.item-row').remove();
+                calculateTotals();
+            } else {
+                window.app.ui.showNotification('warning', '至少需要一項商品');
+            }
+        }
+    });
+
+    itemsContainer.addEventListener('change', (e) => {
+        if (e.target.classList.contains('product-select')) {
+            const selectedOption = e.target.options[e.target.selectedIndex];
+            const cost = selectedOption.dataset.cost || '0';
+            e.target.closest('.item-row').querySelector('.price-input').value = cost;
+        }
+        calculateTotals();
+    });
+
+    form.addEventListener('input', (e) => {
+        if (e.target.matches('#shipping-fee, #tax-rate')) {
+            calculateTotals();
+        }
+    });
+
+    // 初始化
+    init();
+});
+
+===== docs\static\js\reports.js =====
+document.addEventListener('DOMContentLoaded', () => {
+    const topProductsBody = document.getElementById('topProductsBody');
+
+    const loadReport = async () => {
+        window.app.ui.showLoading('載入報表資料...');
+        try {
+            const res = await fetch('./data/reports.json');
+            if (!res.ok) throw new Error('load failed');
+            const data = await res.json();
+            renderCharts(data);
+            renderTopProducts(data.top_products);
+        } catch (err) {
+            console.error(err);
+            window.app.ui.showNotification('error', '載入報表失敗');
+        } finally {
+            window.app.ui.hideLoading();
+        }
+    };
+
+    const renderCharts = (data) => {
+        const dailyLabels = Object.keys(data.daily_sales || {});
+        const dailyValues = Object.values(data.daily_sales || {});
+        const ctxDaily = document.getElementById('dailySalesChart').getContext('2d');
+        new Chart(ctxDaily, {
+            type: 'line',
+            data: {
+                labels: dailyLabels,
+                datasets: [{
+                    label: '銷售額',
+                    data: dailyValues,
+                    backgroundColor: 'rgba(59,130,246,0.1)',
+                    borderColor: 'rgb(59,130,246)',
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true } }
+            }
+        });
+
+        const categoryLabels = Object.keys(data.category_sales || {});
+        const categoryValues = Object.values(data.category_sales || {});
+        const ctxCategory = document.getElementById('categorySalesChart').getContext('2d');
+        new Chart(ctxCategory, {
+            type: 'doughnut',
+            data: {
+                labels: categoryLabels,
+                datasets: [{
+                    data: categoryValues,
+                    backgroundColor: [
+                        '#60a5fa','#34d399','#fbbf24','#f87171','#a78bfa','#f472b6'
+                    ]
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    };
+
+    const renderTopProducts = (products) => {
+        if (!products || products.length === 0) {
+            topProductsBody.innerHTML = '<tr><td colspan="2" class="text-center py-4">無資料</td></tr>';
+            return;
+        }
+        topProductsBody.innerHTML = products.map(p => `
+            <tr>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${p.name}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">$${p.amount}</td>
+            </tr>
+        `).join('');
+    };
+
+    loadReport();
+});
+
+
+===== docs\static\js\sales.js =====
+// static/js/sales.js (全新內容)
+
+document.addEventListener('DOMContentLoaded', function() {
+    // DOM 元素
+    const productGrid = document.getElementById('product-grid');
+    const cartItems = document.getElementById('cart-items');
+    const cartCount = document.getElementById('cart-count');
+    const subtotalElement = document.getElementById('subtotal');
+    const totalAmount = document.getElementById('total-amount');
+    const checkoutBtn = document.getElementById('checkout-btn');
+    const checkoutModal = document.getElementById('checkout-modal');
+    
+    // 全域變數
+    let allProducts = [];
+    let cart = []; // 購物車結構: [{ id, name, price, quantity }, ...]
+    
+    // 初始化
+    const init = async () => {
+        window.app.ui.showLoading('載入商品資料...');
+        try {
+            await loadProducts();
+            renderProductGrid(allProducts);
+            setupEventListeners();
+            updateCartUI();
+        } catch (error) {
+            console.error('初始化失敗:', error);
+            window.app.ui.showNotification('error', '頁面載入失敗');
+        } finally {
+            window.app.ui.hideLoading();
+        }
+    };
+
+    // 載入商品
+    const loadProducts = async () => {
+        const response = await fetch('./data/products.json');
+        if (!response.ok) throw new Error('無法載入商品');
+        allProducts = await response.json();
+    };
+
+    // 渲染商品列表
+    const renderProductGrid = (products) => {
+        if (products.length === 0) {
+            productGrid.innerHTML = `<p class="col-span-full text-center">目前沒有商品</p>`;
+            return;
+        }
+        productGrid.innerHTML = products.map(p => `
+            <div class="bg-white rounded-lg shadow p-3 flex flex-col justify-between cursor-pointer product-item" data-id="${p.id}">
+                <h3 class="font-medium text-gray-800 text-sm truncate">${p.name}</h3>
+                <div class="mt-2 flex justify-between items-center">
+                    <span class="text-lg font-bold text-blue-600">$${p.sale_price}</span>
+                    <span class="text-xs text-gray-500">庫存: ${p.stock}</span>
+                </div>
+            </div>
+        `).join('');
+    };
+
+    // 新增至購物車
+    const addToCart = (productId) => {
+        const product = allProducts.find(p => p.id === productId);
+        if (!product) return;
+
+        const existingItem = cart.find(item => item.id === productId);
+        if (existingItem) {
+            existingItem.quantity++;
+        } else {
+            cart.push({
+                id: product.id,
+                name: product.name,
+                price: product.sale_price,
+                quantity: 1,
+            });
+        }
+        updateCartUI();
+    };
+
+    // 更新購物車 UI
+    const updateCartUI = () => {
+        if (cart.length === 0) {
+            cartItems.innerHTML = `<div class="py-8 text-center text-gray-500">
+                <i class="fas fa-shopping-cart text-4xl mb-2 opacity-30"></i>
+                <p>購物車是空的</p>
+            </div>`;
+        } else {
+            cartItems.innerHTML = cart.map(item => `
+                <div class="flex items-center justify-between py-3 px-2" data-id="${item.id}">
+                    <div class="flex-1">
+                        <p class="font-medium text-sm">${item.name}</p>
+                        <p class="text-xs text-gray-500">$${item.price} x ${item.quantity}</p>
+                    </div>
+                    <div class="font-bold text-sm">$${(item.price * item.quantity).toLocaleString()}</div>
+                    <button class="ml-4 text-red-500 hover:text-red-700 remove-item"><i class="fas fa-times-circle"></i></button>
+                </div>
+            `).join('');
+        }
+
+        const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+        subtotalElement.textContent = `$${subtotal.toLocaleString()}`;
+        totalAmount.textContent = `$${subtotal.toLocaleString()}`; // 假設無折扣
+        cartCount.textContent = `${cart.length} 項商品`;
+
+        checkoutBtn.disabled = cart.length === 0;
+    };
+
+    // 處理結帳流程
+    
+    const processCheckout = () => {
+        window.app.ui.showLoading('結帳中...');
+        setTimeout(() => {
+            window.app.ui.hideLoading();
+            window.app.ui.showNotification('success', '結帳成功！');
+            cart = [];
+            updateCartUI();
+            checkoutModal.classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+        }, 800);
+    };
+            
+
+        window.app.ui.showLoading('結帳中...');
+        try {
+            const response = await fetch('./data/sales.json', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(saleData)
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.detail || '結帳失敗');
+            }
+            
+            window.app.ui.showNotification('success', '結帳成功！');
+            cart = []; // 清空購物車
+            updateCartUI();
+            checkoutModal.classList.add('hidden'); // 關閉結帳視窗
+            document.body.classList.remove('overflow-hidden');
+
+        } catch (error) {
+            console.error('結帳失敗:', error);
+            window.app.ui.showNotification('error', error.message);
+        } finally {
+            window.app.ui.hideLoading();
+        }
+    };
+    
+    // 設定事件監聽器
+    const setupEventListeners = () => {
+        productGrid.addEventListener('click', (e) => {
+            const item = e.target.closest('.product-item');
+            if (item) {
+                addToCart(item.dataset.id);
+            }
+        });
+
+        cartItems.addEventListener('click', (e) => {
+            const removeBtn = e.target.closest('.remove-item');
+            if (removeBtn) {
+                const itemId = removeBtn.closest('[data-id]').dataset.id;
+                cart = cart.filter(item => item.id !== itemId);
+                updateCartUI();
+            }
+        });
+
+        checkoutBtn.addEventListener('click', () => {
+            // 填充結帳 Modal
+            document.getElementById('checkout-total').textContent = totalAmount.textContent;
+            document.getElementById('checkout-subtotal').textContent = subtotalElement.textContent;
+            
+            const checkoutItems = document.getElementById('checkout-items');
+            checkoutItems.innerHTML = cart.map(item => `
+                <tr>
+                    <td class="px-3 py-2">${item.name}</td>
+                    <td class="px-3 py-2 text-right">$${item.price}</td>
+                    <td class="px-3 py-2 text-center">${item.quantity}</td>
+                    <td class="px-3 py-2 text-right">$${item.price * item.quantity}</td>
+                </tr>
+            `).join('');
+
+            checkoutModal.classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+        });
+
+        // 結帳 Modal 內的按鈕
+        document.getElementById('confirm-checkout-btn').addEventListener('click', processCheckout);
+        
+        document.querySelectorAll('.close-checkout-modal-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                checkoutModal.classList.add('hidden');
+                document.body.classList.remove('overflow-hidden');
+            });
+        });
+    };
+
+    // 初始載入
+    init();
+});
+
+===== docs\static\js\suppliers.js =====
+// static/js/suppliers.js (全新內容)
+
+document.addEventListener('DOMContentLoaded', function() {
+    // DOM 元素
+    const addSupplierBtn = document.getElementById('add-supplier-btn');
+    const supplierModal = document.getElementById('supplier-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const supplierForm = document.getElementById('supplier-form');
+    const cancelSupplierBtn = document.getElementById('cancel-supplier');
+    const suppliersList = document.getElementById('suppliers-list');
+
+    let allSuppliers = [];
+
+    // 開啟 Modal
+    const openSupplierModal = (supplier = null) => {
+        supplierForm.reset();
+        supplierForm.dataset.id = '';
+
+        if (supplier) {
+            // 編輯模式
+            modalTitle.textContent = '編輯供應商';
+            supplierForm.dataset.id = supplier.id;
+            document.getElementById('supplier-name').value = supplier.name || '';
+            document.getElementById('contact-person').value = supplier.contact_person || '';
+            document.getElementById('phone').value = supplier.phone || '';
+            document.getElementById('email').value = supplier.email || '';
+            document.getElementById('address').value = supplier.address || '';
+            document.getElementById('payment-terms').value = supplier.payment_terms || '';
+            document.getElementById('notes').value = supplier.notes || '';
+        } else {
+            // 新增模式
+            modalTitle.textContent = '新增供應商';
+        }
+        
+        supplierModal.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+    };
+
+    // 關閉 Modal
+    const closeSupplierModal = () => {
+        supplierModal.classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+    };
+    
+    // 載入供應商資料
+    const loadSuppliers = async () => {
+        window.app.ui.showLoading('載入供應商資料中...');
+        try {
+            const response = await fetch('./data/suppliers.json');
+            if (!response.ok) throw new Error('無法載入供應商資料');
+            allSuppliers = await response.json();
+            renderSuppliers(allSuppliers);
+        } catch (error) {
+            console.error('載入供應商資料失敗:', error);
+            window.app.ui.showNotification('error', '載入供應商資料失敗');
+        } finally {
+            window.app.ui.hideLoading();
+        }
+    };
+
+    // 渲染列表
+    const renderSuppliers = (suppliers) => {
+        if (!suppliersList) return;
+        if (suppliers.length === 0) {
+            suppliersList.innerHTML = `<tr><td colspan="6" class="text-center py-4">沒有供應商資料</td></tr>`;
+            return;
+        }
+
+        suppliersList.innerHTML = suppliers.map(supplier => `
+            <tr data-id="${supplier.id}">
+                <td class="px-6 py-4 whitespace-nowrap">${supplier.name}</td>
+                <td class="px-6 py-4 whitespace-nowrap">${supplier.contact_person}</td>
+                <td class="px-6 py-4 whitespace-nowrap">${supplier.phone}</td>
+                <td class="px-6 py-4 whitespace-nowrap">${supplier.payment_terms}</td>
+                <td class="px-6 py-4 whitespace-nowrap">${new Date(supplier.created_at).toLocaleDateString()}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button class="text-blue-600 hover:text-blue-900 edit-supplier"><i class="fas fa-edit"></i> 編輯</button>
+                    <button class="text-red-600 hover:text-red-900 ml-4 delete-supplier"><i class="fas fa-trash"></i> 刪除</button>
+                </td>
+            </tr>
+        `).join('');
+    };
+
+    // 處理表單提交
+    
+    const handleSubmitSupplier = (e) => {
+        e.preventDefault();
+        const supplierId = supplierForm.dataset.id;
+        const isEdit = !!supplierId;
+        const supplierData = {
+            id: supplierId || `S_NEW_${Date.now()}`,
+            name: document.getElementById('supplier-name').value.trim(),
+            contact_person: document.getElementById('contact-person').value.trim(),
+            phone: document.getElementById('phone').value.trim(),
+            payment_terms: document.getElementById('payment-terms').value,
+            created_at: new Date().toISOString()
+        };
+        if (!supplierData.name || !supplierData.contact_person || !supplierData.phone) {
+            window.app.ui.showNotification('error', '請填寫所有必填欄位 (*)');
+            return;
+        }
+        if (isEdit) {
+            const index = allSuppliers.findIndex(s => s.id === supplierId);
+            if (index !== -1) allSuppliers[index] = { ...allSuppliers[index], ...supplierData };
+        } else {
+            allSuppliers.unshift(supplierData);
+        }
+        renderSuppliers(allSuppliers);
+        closeSupplierModal();
+        window.app.ui.showNotification('success', '供應商資料已成功模擬儲存！');
+    };
+            
+
+        if (!supplierData.name || !supplierData.contact_person || !supplierData.phone) {
+            window.app.ui.showNotification('error', '請填寫所有必填欄位 (*)');
+            return;
+        }
+
+        const url = isEdit ? `./data/suppliers.json/${supplierId}` : './data/suppliers.json';
+        const method = isEdit ? 'PUT' : 'POST';
+
+        window.app.ui.showLoading('儲存中...');
+        try {
+            const response = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(supplierData)
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.detail || '儲存失敗');
+            }
+
+            window.app.ui.showNotification('success', '供應商資料儲存成功！');
+            closeSupplierModal();
+            loadSuppliers();
+        } catch (error) {
+            console.error('儲存供應商失敗:', error);
+            window.app.ui.showNotification('error', error.message);
+        } finally {
+            window.app.ui.hideLoading();
+        }
+    };
+    
+    // 處理列表點擊事件
+    const handleListClick = (e) => {
+        const target = e.target;
+        const row = target.closest('tr');
+        if (!row) return;
+
+        const supplierId = row.dataset.id;
+        const supplier = allSuppliers.find(s => s.id === supplierId);
+
+        if (target.closest('.edit-supplier')) {
+            if (supplier) openSupplierModal(supplier);
+        }
+
+        if (target.closest('.delete-supplier')) {
+             window.app.ui.showConfirmDialog({
+                title: '確認刪除',
+                message: `您確定要刪除供應商 "${supplier.name}" 嗎？`,
+                confirmText: '確認刪除',
+            }).then(confirmed => {
+                if (confirmed) {
+                    deleteSupplier(supplierId);
+                }
+            });
+        }
+    };
+
+    // 刪除供應商
+    
+    const deleteSupplier = (supplierId) => {
+        allSuppliers = allSuppliers.filter(s => s.id !== supplierId);
+        renderSuppliers(allSuppliers);
+        window.app.ui.showNotification('success', '供應商已模擬刪除');
+    };
+            
+
+    // 設定事件監聽
+    addSupplierBtn.addEventListener('click', () => openSupplierModal());
+    cancelSupplierBtn.addEventListener('click', closeSupplierModal);
+    supplierForm.addEventListener('submit', handleSubmitSupplier);
+    suppliersList.addEventListener('click', handleListClick);
+
+    // 初始載入
+    loadSuppliers();
+})
+
+
+===== docs\static\js\ui.js =====
+// UI 通用功能
+class UI {
+    constructor() {
+        this.initializeComponents();
+        this.setupEventListeners();
+    }
+
+    // 初始化所有 UI 組件
+    initializeComponents() {
+        this.loadingElement = document.getElementById('loading');
+        this.notificationsElement = document.getElementById('notifications');
+        this.confirmDialog = document.getElementById('confirm-dialog');
+        
+        if (this.confirmDialog) {
+            this.confirmTitle = document.getElementById('confirm-title');
+            this.confirmMessage = document.getElementById('confirm-message');
+            this.confirmOkBtn = document.getElementById('confirm-ok');
+            this.confirmCancelBtn = document.getElementById('confirm-cancel');
+        }
+    }
+
+    // 設置事件監聽器
+    setupEventListeners() {
+        // 關閉通知按鈕
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('.close-notification')) {
+                this.hideNotification(e.target.closest('.notification'));
+            }
+        });
+
+        // 確認對話框按鈕
+        if (this.confirmCancelBtn) {
+            this.confirmCancelBtn.addEventListener('click', () => this.hideConfirmDialog());
+        }
+    }
+
+    // 顯示加載指示器
+    showLoading(message = '載入中，請稍候...') {
+        if (this.loadingElement) {
+            const messageEl = this.loadingElement.querySelector('span');
+            if (messageEl) messageEl.textContent = message;
+            this.loadingElement.classList.remove('hidden');
+        }
+    }
+
+    // 隱藏加載指示器
+    hideLoading() {
+        if (this.loadingElement) {
+            this.loadingElement.classList.add('hidden');
+        }
+    }
+
+    // 顯示通知
+    showNotification(type, message, duration = 5000) {
+        const notification = document.getElementById(`${type}-notification`);
+        if (!notification) return;
+
+        const messageEl = notification.querySelector('.notification-message');
+        if (messageEl) messageEl.textContent = message;
+
+        notification.classList.remove('hidden');
+        notification.style.animation = 'slideIn 0.3s ease-out';
+
+        // 自動關閉通知
+        if (duration > 0) {
+            setTimeout(() => {
+                this.hideNotification(notification);
+            }, duration);
+        }
+    }
+
+    // 隱藏通知
+    hideNotification(notification) {
+        if (!notification) return;
+        
+        notification.style.animation = 'slideOut 0.3s ease-in';
+        setTimeout(() => {
+            notification.classList.add('hidden');
+            notification.style.animation = '';
+        }, 300);
+    }
+
+    // 顯示確認對話框
+    showConfirmDialog(options = {}) {
+        return new Promise((resolve) => {
+            if (!this.confirmDialog) return resolve(false);
+
+            const {
+                title = '確認操作',
+                message = '您確定要執行此操作嗎？此操作無法復原。',
+                confirmText = '確認',
+                cancelText = '取消',
+                confirmButtonClass = 'bg-red-600 hover:bg-red-700',
+                cancelButtonClass = 'bg-white hover:bg-gray-50'
+            } = options;
+
+            this.confirmTitle.textContent = title;
+            this.confirmMessage.textContent = message;
+            this.confirmOkBtn.textContent = confirmText;
+            this.confirmCancelBtn.textContent = cancelText;
+
+            // 更新按鈕樣式
+            this.confirmOkBtn.className = `ml-3 inline-flex justify-center px-4 py-2 text-sm font-medium text-white border border-transparent rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${confirmButtonClass}`;
+            this.confirmCancelBtn.className = `px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${cancelButtonClass}`;
+
+            this.confirmDialog.classList.remove('hidden');
+
+            // 設置一次性事件監聽器
+            const handleConfirm = () => {
+                cleanup();
+                resolve(true);
+            };
+
+            const handleCancel = () => {
+                cleanup();
+                resolve(false);
+            };
+
+            const cleanup = () => {
+                this.confirmDialog.classList.add('hidden');
+                this.confirmOkBtn.removeEventListener('click', handleConfirm);
+                this.confirmCancelBtn.removeEventListener('click', handleCancel);
+            };
+
+            this.confirmOkBtn.addEventListener('click', handleConfirm);
+            this.confirmCancelBtn.addEventListener('click', handleCancel);
+        });
+    }
+
+    // 隱藏確認對話框
+    hideConfirmDialog() {
+        if (this.confirmDialog) {
+            this.confirmDialog.classList.add('hidden');
+        }
+    }
+
+    // 禁用表單按鈕
+    disableButtons(form, disabled = true) {
+        const buttons = form.querySelectorAll('button, [type="submit"], [type="button"]');
+        buttons.forEach(button => {
+            if (disabled) {
+                button.setAttribute('disabled', 'disabled');
+            } else {
+                button.removeAttribute('disabled');
+            }
+        });
+    }
+
+    // 格式化日期
+    formatDate(date, format = 'YYYY-MM-DD') {
+        if (!date) return '';
+        
+        const d = new Date(date);
+        if (isNaN(d.getTime())) return '';
+
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        const seconds = String(d.getSeconds()).padStart(2, '0');
+
+        return format
+            .replace('YYYY', year)
+            .replace('MM', month)
+            .replace('DD', day)
+            .replace('HH', hours)
+            .replace('mm', minutes)
+            .replace('ss', seconds);
+    }
+
+    // 格式化貨幣
+    formatCurrency(amount, currency = 'TWD') {
+        if (amount === null || amount === undefined) return '';
+        return new Intl.NumberFormat('zh-TW', {
+            style: 'currency',
+            currency: currency,
+            minimumFractionDigits: 0
+        }).format(amount);
+    }
+}
+
+// 初始化 UI 實例
+window.ui = new UI();
+// 導出 UI 實例
+if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {
+    module.exports = ui;
+} else {
+    window.UI = ui;
+}
+
+
+
+===== services\base_service.py =====
+from typing import Dict, List, Type, TypeVar, Any, Optional
+from datetime import datetime
+import json
+import os
+from pathlib import Path
+"""Base service for CRUD operations backed by JSON files."""
+
+# Importing from the root-level ``models`` module using an absolute import.
+# Relative imports like ``from ..models`` fail when the application is
+# executed as a script because there is no package above ``services``. Using
+# absolute imports avoids this issue.
+from models import COLLECTIONS
+
+T = TypeVar('T')
+
+class BaseService:
+    """
+    基礎服務類，提供基本的 CRUD 操作
+    使用本地 JSON 文件模擬 Firestore 集合
+    """
+    def __init__(self, collection_name: str, data_dir: str = 'data'):
+        self.collection_name = collection_name
+        self.data_dir = Path(data_dir)
+        self.data_dir.mkdir(exist_ok=True)
+        self.file_path = self.data_dir / f"{collection_name}.json"
+        self._data: Dict[str, Dict] = self._load_data()
+    
+    def _load_data(self) -> Dict[str, Dict]:
+        """從 JSON 文件載入數據"""
+        if self.file_path.exists():
+            with open(self.file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    # convert list to dict keyed by id
+                    return {item.get('id', str(idx)): item for idx, item in enumerate(data)}
+                if isinstance(data, dict):
+                    # handle wrapped array {"items": [...]}
+                    if len(data) == 1 and isinstance(next(iter(data.values())), list):
+                        arr = next(iter(data.values()))
+                        return {item.get('id', str(idx)): item for idx, item in enumerate(arr)}
+                    return data
+        return {}
+    
+    def _save_data(self):
+        """保存數據到 JSON 文件"""
+        with open(self.file_path, 'w', encoding='utf-8') as f:
+            json.dump(list(self._data.values()), f, ensure_ascii=False, indent=2)
+    
+    def create(self, item: Dict) -> str:
+        """創建新項目"""
+        item_id = item.get('id')
+        if not item_id:
+            from uuid import uuid4
+            item_id = str(uuid4())
+            item['id'] = item_id
+        
+        # 添加時間戳
+        now = datetime.now().isoformat()
+        if 'created_at' not in item:
+            item['created_at'] = now
+        item['updated_at'] = now
+        
+        self._data[item_id] = item
+        self._save_data()
+        return item_id
+    
+    def get(self, item_id: str) -> Optional[Dict]:
+        """根據 ID 獲取項目"""
+        return self._data.get(item_id)
+    
+    def get_all(self) -> List[Dict]:
+        """獲取所有項目"""
+        return list(self._data.values())
+    
+    def update(self, item_id: str, updates: Dict) -> bool:
+        """更新項目"""
+        if item_id not in self._data:
+            return False
+        
+        # 保留原始創建時間
+        if 'created_at' not in updates:
+            updates['created_at'] = self._data[item_id].get('created_at')
+        
+        # 更新時間戳
+        updates['updated_at'] = datetime.now().isoformat()
+        
+        # 更新數據
+        self._data[item_id].update(updates)
+        self._save_data()
+        return True
+    
+    def delete(self, item_id: str) -> bool:
+        """刪除項目"""
+        if item_id in self._data:
+            del self._data[item_id]
+            self._save_data()
+            return True
+        return False
+    
+    def query(self, **filters) -> List[Dict]:
+        """查詢項目"""
+        results = []
+        for item in self._data.values():
+            match = True
+            for key, value in filters.items():
+                if item.get(key) != value:
+                    match = False
+                    break
+            if match:
+                results.append(item)
+        return results
+
+
+===== services\member_service.py =====
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Tuple
+# Use absolute imports for the models module.
+from models import Member, Sale
+from .base_service import BaseService
+from .sale_service import SaleService
+
+class MemberService(BaseService):
+    """
+    會員服務類，處理會員相關的業務邏輯
+    """
+    def __init__(self, data_dir: str = 'data'):
+        super().__init__('members', data_dir)
+        self.sale_service = SaleService(data_dir)
+    
+    def create_member(self, member_data: Dict) -> Tuple[bool, str]:
+        """創建新會員"""
+        # 驗證必填欄位
+        if not member_data.get('name'):
+            return False, "會員姓名不能為空"
+        
+        # 檢查電話是否已存在
+        phone = member_data.get('phone')
+        if phone and self.get_member_by_phone(phone):
+            return False, "該電話號碼已被註冊"
+        
+        # 設置默認值
+        member_data.setdefault('note', '')
+        member_data.setdefault('created_at', datetime.now().isoformat())
+        member_data.setdefault('updated_at', datetime.now().isoformat())
+        
+        # 創建會員
+        member_id = self.create(member_data)
+        return True, member_id
+    
+    def update_member(self, member_id: str, updates: Dict) -> bool:
+        """更新會員資料"""
+        # 檢查會員是否存在
+        if not self.get(member_id):
+            return False
+        
+        # 如果更新電話，檢查是否已被其他會員使用
+        if 'phone' in updates:
+            existing_member = self.get_member_by_phone(updates['phone'])
+            if existing_member and existing_member['id'] != member_id:
+                return False
+        
+        # 更新資料
+        updates['updated_at'] = datetime.now().isoformat()
+        return self.update(member_id, updates)
+    
+    def get_member_by_phone(self, phone: str) -> Optional[Dict]:
+        """根據電話號碼查詢會員"""
+        members = self.query(phone=phone)
+        return members[0] if members else None
+    
+    def get_member_purchase_history(self, member_id: str) -> List[Dict]:
+        """獲取會員的購買歷史"""
+        return self.sale_service.get_sales_by_member(member_id)
+    
+    def get_member_summary(self, member_id: str) -> Dict:
+        """獲取會員摘要信息"""
+        member = self.get(member_id)
+        if not member:
+            return {}
+        
+        # 獲取購買歷史
+        purchases = self.get_member_purchase_history(member_id)
+        
+        # 計算總消費金額
+        total_spent = sum(sale.get('final_amount', 0) for sale in purchases)
+        
+        # 獲取最後消費日期
+        last_purchase_date = None
+        if purchases:
+            last_purchase = max(purchases, key=lambda x: x.get('sale_date', ''))
+            last_purchase_date = last_purchase.get('sale_date')
+        
+        return {
+            'member_id': member_id,
+            'name': member.get('name'),
+            'phone': member.get('phone'),
+            'total_purchases': len(purchases),
+            'total_spent': total_spent,
+            'last_purchase_date': last_purchase_date,
+            'member_since': member.get('created_at')
+        }
+    
+    def get_vip_members(self, min_purchases: int = 5, days: int = 90) -> List[Dict]:
+        """
+        獲取VIP會員列表
+        :param min_purchases: 最低購買次數
+        :param days: 最近多少天內的活躍會員
+        :return: VIP會員列表
+        """
+        vip_members = []
+        cutoff_date = (datetime.now() - timedelta(days=days)).isoformat()
+        
+        for member in self.get_all():
+            member_id = member['id']
+            purchases = self.get_member_purchase_history(member_id)
+            
+            # 篩選指定時間內的購買記錄
+            recent_purchases = [
+                p for p in purchases 
+                if p.get('sale_date', '') >= cutoff_date
+            ]
+            
+            if len(recent_purchases) >= min_purchases:
+                total_spent = sum(p.get('final_amount', 0) for p in recent_purchases)
+                
+                vip_member = {
+                    'member_id': member_id,
+                    'name': member.get('name'),
+                    'phone': member.get('phone'),
+                    'purchase_count': len(recent_purchases),
+                    'total_spent': total_spent,
+                    'last_purchase_date': max(p.get('sale_date') for p in recent_purchases)
+                }
+                vip_members.append(vip_member)
+        
+        # 按總消費金額降序排序
+        return sorted(vip_members, key=lambda x: x['total_spent'], reverse=True)
+    
+    def get_inactive_members(self, days: int = 180) -> List[Dict]:
+        """
+        獲取不活躍會員列表
+        :param days: 多少天內沒有消費視為不活躍
+        :return: 不活躍會員列表
+        """
+        inactive_members = []
+        cutoff_date = (datetime.now() - timedelta(days=days)).isoformat()
+        
+        for member in self.get_all():
+            member_id = member['id']
+            purchases = self.get_member_purchase_history(member_id)
+            
+            if not purchases:
+                # 從未消費過的會員
+                member_info = {
+                    'member_id': member_id,
+                    'name': member.get('name'),
+                    'phone': member.get('phone'),
+                    'last_purchase_date': None,
+                    'days_inactive': (datetime.now() - datetime.fromisoformat(member.get('created_at'))).days
+                }
+                inactive_members.append(member_info)
+            else:
+                # 篩選最近的購買記錄
+                last_purchase = max(purchases, key=lambda x: x.get('sale_date', ''))
+                last_purchase_date = last_purchase.get('sale_date')
+                
+                if last_purchase_date < cutoff_date:
+                    member_info = {
+                        'member_id': member_id,
+                        'name': member.get('name'),
+                        'phone': member.get('phone'),
+                        'last_purchase_date': last_purchase_date,
+                        'days_inactive': (datetime.now() - datetime.fromisoformat(last_purchase_date)).days
+                    }
+                    inactive_members.append(member_info)
+        
+        # 按不活躍天數降序排序
+        return sorted(inactive_members, key=lambda x: x['days_inactive'], reverse=True)
+
+
+===== services\product_service.py =====
+from typing import List, Dict, Optional
+# Use absolute imports so the module works when running the app directly.
+from models import Product
+from .base_service import BaseService
+
+class ProductService(BaseService):
+    """
+    商品服務類，處理商品相關的業務邏輯
+    """
+    def __init__(self, data_dir: str = 'data'):
+        super().__init__('products', data_dir)
+    
+    def create_product(self, product_data: Dict) -> str:
+        """創建新商品"""
+        # 驗證必填欄位
+        if not product_data.get('name'):
+            raise ValueError("商品名稱不能為空")
+        
+        # 設置默認值
+        product_data.setdefault('stock', 0)
+        product_data.setdefault('cost_price', 0.0)
+        product_data.setdefault('selling_price', 0.0)
+        
+        # 創建商品
+        return self.create(product_data)
+    
+    def update_product(self, product_id: str, updates: Dict) -> bool:
+        """更新商品信息"""
+        # 檢查商品是否存在
+        if not self.get(product_id):
+            return False
+            
+        # 過濾掉不允許更新的欄位
+        updates.pop('id', None)
+        updates.pop('created_at', None)
+        
+        return self.update(product_id, updates)
+    
+    def get_products_by_category(self, category: str) -> List[Dict]:
+        """根據分類獲取商品列表"""
+        return self.query(category=category)
+    
+    def update_stock(self, product_id: str, quantity: int) -> bool:
+        """更新庫存數量"""
+        product = self.get(product_id)
+        if not product:
+            return False
+            
+        new_stock = product.get('stock', 0) + quantity
+        if new_stock < 0:
+            raise ValueError("庫存數量不能為負")
+            
+        return self.update(product_id, {'stock': new_stock})
+    
+    def get_low_stock_products(self, threshold: int = 5) -> List[Dict]:
+        """獲取低於指定庫存閾值的商品"""
+        return [p for p in self.get_all() if p.get('stock', 0) < threshold]
+
+
+===== services\purchase_service.py =====
+from datetime import datetime
+from typing import Dict, List, Optional, Tuple
+# Absolute import ensures compatibility when executed outside of a package
+# context.
+from models import Purchase, PurchaseItem, Product
+from .base_service import BaseService
+from .product_service import ProductService
+
+class PurchaseService(BaseService):
+    """
+    進貨服務類，處理進貨相關的業務邏輯
+    """
+    def __init__(self, data_dir: str = 'data'):
+        super().__init__('purchases', data_dir)
+        self.purchase_items = BaseService('purchase_items', data_dir)
+        self.product_service = ProductService(data_dir)
+    
+    def create_purchase(self, purchase_data: Dict) -> Tuple[bool, str]:
+        """創建進貨單"""
+        # 驗證必填欄位
+        if not purchase_data.get('supplier_id'):
+            return False, "供應商不能為空"
+            
+        if not purchase_data.get('items') or not isinstance(purchase_data['items'], list):
+            return False, "進貨項目不能為空"
+        
+        # 計算總金額
+        total_amount = 0.0
+        items = purchase_data.pop('items', [])
+        
+        # 創建進貨單
+        purchase_data['total_amount'] = total_amount
+        purchase_data['paid'] = purchase_data.get('paid', False)
+        purchase_id = self.create(purchase_data)
+        
+        # 處理進貨明細
+        for item in items:
+            if not item.get('product_id') or not item.get('quantity') or not item.get('unit_price'):
+                self.delete(purchase_id)  # 刪除已創建的進貨單
+                return False, "進貨項目資訊不完整"
+                
+            quantity = int(item['quantity'])
+            unit_price = float(item['unit_price'])
+            item_total = quantity * unit_price
+            total_amount += item_total
+            
+            # 創建進貨明細
+            purchase_item = {
+                'purchase_id': purchase_id,
+                'product_id': item['product_id'],
+                'quantity': quantity,
+                'unit_price': unit_price,
+                'total_price': item_total
+            }
+            self.purchase_items.create(purchase_item)
+            
+            # 更新商品庫存
+            self.product_service.update_stock(item['product_id'], quantity)
+        
+        # 更新進貨單總金額
+        self.update(purchase_id, {'total_amount': total_amount})
+        
+        return True, purchase_id
+    
+    def get_purchase_details(self, purchase_id: str) -> Optional[Dict]:
+        """獲取進貨單明細"""
+        purchase = self.get(purchase_id)
+        if not purchase:
+            return None
+            
+        # 獲取進貨明細
+        items = self.purchase_items.query(purchase_id=purchase_id)
+        
+        # 獲取商品詳情
+        product_service = ProductService()
+        for item in items:
+            product = product_service.get(item['product_id'])
+            if product:
+                item['product_name'] = product.get('name', '未知商品')
+        
+        purchase['items'] = items
+        return purchase
+    
+    def get_purchases_by_supplier(self, supplier_id: str) -> List[Dict]:
+        """根據供應商獲取進貨單列表"""
+        return self.query(supplier_id=supplier_id)
+    
+    def mark_as_paid(self, purchase_id: str, paid: bool = True) -> bool:
+        """標記進貨單付款狀態"""
+        updates = {
+            'paid': paid,
+            'paid_date': datetime.now().isoformat() if paid else None
+        }
+        return self.update(purchase_id, updates)
+
+
+===== services\report_service.py =====
+from datetime import datetime, timedelta
+from typing import Dict, List, Tuple, Optional
+from collections import defaultdict
+from .base_service import BaseService
+from .product_service import ProductService
+from .sale_service import SaleService
+from .purchase_service import PurchaseService
+from .supplier_service import SupplierService
+from .member_service import MemberService
+
+class ReportService:
+    """
+    報表服務類，處理各種業務報表生成
+    """
+    def __init__(self, data_dir: str = 'data'):
+        self.product_service = ProductService(data_dir)
+        self.sale_service = SaleService(data_dir)
+        self.purchase_service = PurchaseService(data_dir)
+        self.supplier_service = SupplierService(data_dir)
+        self.member_service = MemberService(data_dir)
+    
+    def get_sales_report(self, start_date: str = None, end_date: str = None) -> Dict:
+        """
+        獲取銷售報表
+        :param start_date: 開始日期 (YYYY-MM-DD)
+        :param end_date: 結束日期 (YYYY-MM-DD)
+        :return: 銷售報表數據
+        """
+        # 設置默認日期範圍（最近30天）
+        if not end_date:
+            end_date = datetime.now().strftime('%Y-%m-%d')
+        if not start_date:
+            start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+        
+        # 獲取銷售記錄
+        sales = []
+        all_sales = self.sale_service.get_all()
+        for sale in all_sales:
+            sale_date = sale.get('sale_date', '').split('T')[0]  # 只取日期部分
+            if start_date <= sale_date <= end_date:
+                sales.append(sale)
+        
+        # 計算銷售統計
+        total_sales = len(sales)
+        total_amount = sum(sale.get('final_amount', 0) for sale in sales)
+        total_discount = sum(sale.get('discount_amount', 0) for sale in sales)
+        
+        # 按日期分組
+        daily_sales = defaultdict(float)
+        for sale in sales:
+            sale_date = sale.get('sale_date', '').split('T')[0]
+            daily_sales[sale_date] += sale.get('final_amount', 0)
+        
+        # 按商品分類統計
+        category_sales = defaultdict(float)
+        product_sales = defaultdict(float)
+        
+        for sale in sales:
+            sale_id = sale['id']
+            sale_details = self.sale_service.get_sale_details(sale_id)
+            
+            for item in sale_details.get('items', []):
+                product_id = item.get('product_id')
+                product = self.product_service.get(product_id)
+                if product:
+                    category = product.get('category', '未分類')
+                    category_sales[category] += item.get('total_price', 0)
+                    product_sales[product.get('name')] += item.get('total_price', 0)
+        
+        # 獲取最暢銷商品（按銷售額）
+        top_products = sorted(
+            [{'name': k, 'amount': v} for k, v in product_sales.items()],
+            key=lambda x: x['amount'],
+            reverse=True
+        )[:10]  # 取前10名
+        
+        return {
+            'report_period': {'start_date': start_date, 'end_date': end_date},
+            'summary': {
+                'total_sales': total_sales,
+                'total_amount': total_amount,
+                'total_discount': total_discount,
+                'average_order_value': total_amount / total_sales if total_sales > 0 else 0
+            },
+            'daily_sales': dict(daily_sales),
+            'category_sales': dict(category_sales),
+            'top_products': top_products
+        }
+    
+    def get_inventory_report(self) -> Dict:
+        """
+        獲取庫存報表
+        :return: 庫存報表數據
+        """
+        products = self.product_service.get_all()
+        
+        # 計算庫存總值
+        total_value = sum(p.get('stock', 0) * p.get('cost_price', 0) for p in products)
+        
+        # 按分類統計
+        category_inventory = defaultdict(lambda: {'count': 0, 'value': 0.0})
+        for product in products:
+            category = product.get('category', '未分類')
+            category_inventory[category]['count'] += 1
+            category_inventory[category]['value'] += product.get('stock', 0) * product.get('cost_price', 0)
+        
+        # 低庫存商品
+        low_stock_products = [
+            p for p in products 
+            if p.get('stock', 0) <= p.get('reorder_level', 5)  # 默認再訂購點為5
+        ]
+        
+        return {
+            'total_products': len(products),
+            'total_inventory_value': total_value,
+            'category_summary': dict(category_inventory),
+            'low_stock_products': [
+                {
+                    'id': p['id'],
+                    'name': p.get('name'),
+                    'stock': p.get('stock', 0),
+                    'reorder_level': p.get('reorder_level', 5)
+                }
+                for p in low_stock_products
+            ]
+        }
+    
+    def get_supplier_report(self) -> Dict:
+        """
+        獲取供應商報表
+        :return: 供應商報表數據
+        """
+        suppliers = self.supplier_service.get_all()
+        report = []
+        
+        for supplier in suppliers:
+            supplier_id = supplier['id']
+            supplier_name = supplier.get('name', '未知供應商')
+            
+            # 獲取未付款的進貨單
+            unpaid_purchases = self.supplier_service.get_supplier_purchases(supplier_id, include_paid=False)
+            total_unpaid = sum(p.get('total_amount', 0) for p in unpaid_purchases)
+            
+            # 獲取最近一筆進貨
+            last_purchase_date = max(
+                (p.get('purchase_date', '') for p in unpaid_purchases),
+                default='無進貨記錄'
+            )
+            
+            report.append({
+                'supplier_id': supplier_id,
+                'supplier_name': supplier_name,
+                'contact': supplier.get('contact', ''),
+                'payment_cycle': supplier.get('payment_cycle', 'monthly'),
+                'total_unpaid': total_unpaid,
+                'unpaid_orders': len(unpaid_purchases),
+                'last_purchase_date': last_purchase_date
+            })
+        
+        # 按未付款金額降序排序
+        report.sort(key=lambda x: x['total_unpaid'], reverse=True)
+        
+        return {
+            'total_suppliers': len(suppliers),
+            'total_unpaid_amount': sum(item['total_unpaid'] for item in report),
+            'suppliers': report
+        }
+    
+    def get_member_analysis_report(self) -> Dict:
+        """
+        獲取會員分析報表
+        :return: 會員分析報表數據
+        """
+        members = self.member_service.get_all()
+        
+        # 會員增長趨勢（按月）
+        member_growth = defaultdict(int)
+        for member in members:
+            if 'created_at' in member:
+                month = member['created_at'][:7]  # YYYY-MM
+                member_growth[month] += 1
+        
+        # 會員消費分層
+        spending_tiers = {
+            'high': 0,    # 高消費 (> 5000)
+            'medium': 0,  # 中消費 (1000-5000)
+            'low': 0,     # 低消費 (< 1000)
+            'inactive': 0 # 從未消費
+        }
+        
+        for member in members:
+            member_id = member['id']
+            purchases = self.member_service.get_member_purchase_history(member_id)
+            
+            if not purchases:
+                spending_tiers['inactive'] += 1
+                continue
+                
+            total_spent = sum(p.get('final_amount', 0) for p in purchases)
+            
+            if total_spent >= 5000:
+                spending_tiers['high'] += 1
+            elif total_spent >= 1000:
+                spending_tiers['medium'] += 1
+            else:
+                spending_tiers['low'] += 1
+        
+        # 獲取VIP會員
+        vip_members = self.member_service.get_vip_members()
+        
+        return {
+            'total_members': len(members),
+            'member_growth': dict(member_growth),
+            'spending_tiers': spending_tiers,
+            'vip_members_count': len(vip_members),
+            'top_vip_members': vip_members[:10]  # 取消費金額最高的前10名VIP
+        }
+    
+    def get_daily_summary(self, date: str = None) -> Dict:
+        """
+        獲取每日營運摘要
+        :param date: 日期 (YYYY-MM-DD)，默認為今天
+        :return: 每日營運摘要
+        """
+        if not date:
+            date = datetime.now().strftime('%Y-%m-%d')
+        
+        # 銷售摘要
+        sales_summary = self.sale_service.get_daily_sales_summary(date)
+        
+        # 新增會員數
+        members = self.member_service.get_all()
+        new_members = sum(
+            1 for m in members 
+            if m.get('created_at', '').startswith(date)
+        )
+        
+        # 熱銷商品
+        sales = [s for s in self.sale_service.get_all() 
+                if s.get('sale_date', '').startswith(date)]
+        
+        product_sales = defaultdict(int)
+        for sale in sales:
+            sale_details = self.sale_service.get_sale_details(sale['id'])
+            for item in sale_details.get('items', []):
+                product_sales[item.get('product_id')] += item.get('quantity', 0)
+        
+        top_selling_products = [
+            {
+                'product_id': pid,
+                'product_name': self.product_service.get(pid).get('name', '未知商品'),
+                'quantity': qty
+            }
+            for pid, qty in sorted(
+                product_sales.items(), 
+                key=lambda x: x[1], 
+                reverse=True
+            )[:5]  # 取前5名
+        ]
+        
+        return {
+            'date': date,
+            'sales_summary': sales_summary,
+            'new_members': new_members,
+            'top_selling_products': top_selling_products
+        }
+
+
+===== services\sale_service.py =====
+from datetime import datetime
+from typing import Dict, List, Optional, Tuple
+# Absolute import prevents relative import errors when running main.py.
+from models import Sale, SaleItem, Discount, Product
+from .base_service import BaseService
+from .product_service import ProductService
+
+class SaleService(BaseService):
+    """
+    銷售服務類，處理銷售相關的業務邏輯
+    """
+    def __init__(self, data_dir: str = 'data'):
+        super().__init__('sales', data_dir)
+        self.sale_items = BaseService('sale_items', data_dir)
+        self.product_service = ProductService(data_dir)
+        self.discounts = BaseService('discounts', data_dir)
+    
+    def create_sale(self, sale_data: Dict) -> Tuple[bool, str]:
+        """創建銷售記錄"""
+        # 驗證必填欄位
+        if not sale_data.get('items') or not isinstance(sale_data['items'], list):
+            return False, "銷售項目不能為空"
+        
+        # 初始化銷售單數據
+        sale_id = self._generate_sale_id()
+        now = datetime.now().isoformat()
+        
+        sale = {
+            'id': sale_id,
+            'member_id': sale_data.get('member_id'),
+            'sale_date': now,
+            'total_amount': 0.0,
+            'discount_amount': 0.0,
+            'final_amount': 0.0,
+            'payment_method': sale_data.get('payment_method', 'cash'),
+            'created_at': now,
+            'updated_at': now
+        }
+        
+        # 處理銷售明細
+        total_amount = 0.0
+        discount_amount = 0.0
+        
+        for item_data in sale_data['items']:
+            product_id = item_data.get('product_id')
+            quantity = int(item_data.get('quantity', 1))
+            
+            # 獲取商品信息
+            product = self.product_service.get(product_id)
+            if not product:
+                return False, f"找不到商品 ID: {product_id}"
+            
+            # 檢查庫存
+            if product.get('stock', 0) < quantity:
+                return False, f"商品 {product.get('name')} 庫存不足"
+            
+            # 計算單價和總價
+            unit_price = float(item_data.get('unit_price', product.get('selling_price', 0)))
+            item_total = unit_price * quantity
+            
+            # 應用折扣（如果有的話）
+            item_discount = self._calculate_discount(product_id, quantity, unit_price)
+            item_final_total = item_total - item_discount
+            
+            # 創建銷售明細
+            sale_item = {
+                'sale_id': sale_id,
+                'product_id': product_id,
+                'quantity': quantity,
+                'unit_price': unit_price,
+                'discount': item_discount,
+                'total_price': item_final_total
+            }
+            self.sale_items.create(sale_item)
+            
+            # 更新總金額和折扣金額
+            total_amount += item_total
+            discount_amount += item_discount
+            
+            # 更新庫存
+            self.product_service.update_stock(product_id, -quantity)
+        
+        # 更新銷售單總金額
+        final_amount = total_amount - discount_amount
+        sale.update({
+            'total_amount': total_amount,
+            'discount_amount': discount_amount,
+            'final_amount': final_amount
+        })
+        
+        # 保存銷售單
+        self.create(sale)
+        
+        return True, sale_id
+    
+    def _calculate_discount(self, product_id: str, quantity: int, unit_price: float) -> float:
+        """計算商品折扣金額"""
+        # 獲取適用的折扣
+        applicable_discounts = []
+        
+        # 1. 檢查商品特定折扣
+        product_discounts = self.discounts.query(
+            target_type='product',
+            target_id=product_id
+        )
+        applicable_discounts.extend(product_discounts)
+        
+        # 2. 檢查分類折扣（如果有分類信息）
+        product = self.product_service.get(product_id)
+        if product and product.get('category'):
+            category_discounts = self.discounts.query(
+                target_type='category',
+                target_id=product['category']
+            )
+            applicable_discounts.extend(category_discounts)
+        
+        # 3. 檢查全店折扣
+        all_discounts = self.discounts.query(target_type='all')
+        applicable_discounts.extend(all_discounts)
+        
+        # 過期過濾
+        now = datetime.now()
+        applicable_discounts = [
+            d for d in applicable_discounts
+            if (not d.get('valid_from') or datetime.fromisoformat(d['valid_from']) <= now) and \
+               (not d.get('valid_to') or datetime.fromisoformat(d['valid_to']) >= now)
+        ]
+        
+        # 如果沒有適用的折扣，返回0
+        if not applicable_discounts:
+            return 0.0
+        
+        # 使用第一個適用的折扣（可以根據優先級排序後選擇）
+        discount = applicable_discounts[0]
+        
+        # 計算折扣金額
+        if discount['discount_type'] == 'percentage':
+            return (unit_price * quantity) * (discount['value'] / 100)
+        else:  # fixed
+            return discount['value'] * quantity
+    
+    def get_sale_details(self, sale_id: str) -> Optional[Dict]:
+        """獲取銷售單明細"""
+        sale = self.get(sale_id)
+        if not sale:
+            return None
+        
+        # 獲取銷售明細
+        items = self.sale_items.query(sale_id=sale_id)
+        
+        # 獲取商品詳情
+        for item in items:
+            product = self.product_service.get(item['product_id'])
+            if product:
+                item['product_name'] = product.get('name', '未知商品')
+        
+        sale['items'] = items
+        return sale
+    
+    def get_sales_by_member(self, member_id: str) -> List[Dict]:
+        """根據會員獲取銷售記錄"""
+        return self.query(member_id=member_id)
+    
+    def get_daily_sales_summary(self, date: str = None) -> Dict:
+        """獲取指定日期的銷售摘要"""
+        if not date:
+            date = datetime.now().strftime('%Y-%m-%d')
+        
+        sales = self.query(sale_date=date)
+        
+        return {
+            'date': date,
+            'total_sales': len(sales),
+            'total_amount': sum(s.get('final_amount', 0) for s in sales),
+            'total_discount': sum(s.get('discount_amount', 0) for s in sales)
+        }
+    
+    def _generate_sale_id(self) -> str:
+        """生成銷售單號"""
+        # 格式: S + 年月日 + 4位隨機數
+        timestamp = datetime.now().strftime('%Y%m%d')
+        import random
+        random_num = f"{random.randint(0, 9999):04d}"
+        return f"S{timestamp}{random_num}"
+
+
+===== services\supplier_service.py =====
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Tuple
+# Absolute import of models so relative imports don't break when running
+# ``main.py`` directly.
+from models import Supplier, Purchase, Payment
+from .base_service import BaseService
+from .purchase_service import PurchaseService
+
+class SupplierService(BaseService):
+    """
+    供應商服務類，處理供應商相關的業務邏輯
+    """
+    def __init__(self, data_dir: str = 'data'):
+        super().__init__('suppliers', data_dir)
+        self.purchase_service = PurchaseService(data_dir)
+        self.payments = BaseService('payments', data_dir)
+    
+    def create_supplier(self, supplier_data: Dict) -> Tuple[bool, str]:
+        """創建新供應商"""
+        # 驗證必填欄位
+        if not supplier_data.get('name'):
+            return False, "供應商名稱不能為空"
+        
+        # 設置默認值
+        supplier_data.setdefault('payment_cycle', 'monthly')  # 默認月結
+        supplier_data.setdefault('note', '')
+        
+        # 創建供應商
+        supplier_id = self.create(supplier_data)
+        return True, supplier_id
+    
+    def get_supplier_purchases(self, supplier_id: str, include_paid: bool = False) -> List[Dict]:
+        """獲取供應商的進貨記錄"""
+        purchases = self.purchase_service.get_purchases_by_supplier(supplier_id)
+        if not include_paid:
+            purchases = [p for p in purchases if not p.get('paid', False)]
+        return purchases
+    
+    def get_outstanding_balance(self, supplier_id: str) -> float:
+        """計算供應商未付款總額"""
+        purchases = self.get_supplier_purchases(supplier_id, include_paid=False)
+        return sum(p.get('total_amount', 0) for p in purchases)
+    
+    def create_payment(self, supplier_id: str, payment_data: Dict) -> Tuple[bool, str]:
+        """創建付款記錄"""
+        # 驗證必填欄位
+        if not payment_data.get('amount') or float(payment_data['amount']) <= 0:
+            return False, "付款金額必須大於0"
+            
+        if not payment_data.get('payment_date'):
+            payment_data['payment_date'] = datetime.now().isoformat()
+        
+        # 創建付款記錄
+        payment_data.update({
+            'supplier_id': supplier_id,
+            'created_at': datetime.now().isoformat()
+        })
+        
+        payment_id = self.payments.create(payment_data)
+        
+        # 如果指定了要標記為已付款的進貨單，則更新這些進貨單的狀態
+        purchase_ids = payment_data.get('purchase_ids', [])
+        if purchase_ids:
+            for purchase_id in purchase_ids:
+                self.purchase_service.mark_as_paid(purchase_id)
+        
+        return True, payment_id
+    
+    def get_payment_history(self, supplier_id: str) -> List[Dict]:
+        """獲取供應商的付款記錄"""
+        return self.payments.query(supplier_id=supplier_id)
+    
+    def get_payment_schedule(self) -> Dict[str, List[Dict]]:
+        """
+        獲取付款排程
+        返回按供應商分組的待付款進貨單
+        """
+        schedule = {}
+        suppliers = self.get_all()
+        
+        for supplier in suppliers:
+            supplier_id = supplier['id']
+            unpaid_purchases = self.get_supplier_purchases(supplier_id, include_paid=False)
+            
+            if unpaid_purchases:
+                schedule[supplier['name']] = {
+                    'supplier': supplier,
+                    'total_amount': sum(p['total_amount'] for p in unpaid_purchases),
+                    'purchases': unpaid_purchases
+                }
+        
+        return schedule
+    
+    def get_upcoming_payments(self, days_ahead: int = 30) -> Dict[str, List[Dict]]:
+        """
+        獲取即將到期的應付款項
+        """
+        today = datetime.now().date()
+        end_date = today + timedelta(days=days_ahead)
+        
+        upcoming_payments = {}
+        suppliers = self.get_all()
+        
+        for supplier in suppliers:
+            supplier_id = supplier['id']
+            purchases = self.get_supplier_purchases(supplier_id, include_paid=False)
+            
+            # 根據供應商的結帳週期計算應付款日期
+            if supplier['payment_cycle'] == 'monthly':
+                due_date = today.replace(day=1) + timedelta(days=32)  # 下個月初
+                due_date = due_date.replace(day=1)
+            else:  # quarterly
+                quarter = (today.month - 1) // 3 + 1
+                due_month = quarter * 3 + 1  # 下個季度的第一個月
+                due_year = today.year
+                if due_month > 12:
+                    due_month = 1
+                    due_year += 1
+                due_date = today.replace(month=due_month, day=1, year=due_year)
+            
+            if today <= due_date <= end_date:
+                upcoming_payments[supplier['name']] = {
+                    'due_date': due_date.isoformat(),
+                    'amount': sum(p['total_amount'] for p in purchases if not p.get('paid', False)),
+                    'payment_cycle': supplier['payment_cycle']
+                }
+        
+        return upcoming_payments
+
+
+===== services\__init__.py =====
+# 初始化 services 套件
+
+
+===== static\js\main.js =====
+// static/js/main.js (替換後的全新內容)
+
+class BookstoreApp {
+    constructor() {
+        // 這裡不直接使用 new UI()，而是等到 ui.js 自己初始化
+        // 這樣可以確保我們總是使用同一個 ui 實例
+        this.ui = window.ui;
+        this.initializeMobileMenu();
+    }
+
+    // 初始化移動端菜單
+    initializeMobileMenu() {
+        const menuButton = document.getElementById('mobile-menu-button');
+        const mobileMenu = document.getElementById('mobile-menu');
+        
+        if (menuButton && mobileMenu) {
+            menuButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                mobileMenu.classList.toggle('hidden');
+            });
+        }
+    }
+}
+
+// 確保在 DOM 載入後，並且 ui.js 已經初始化完畢
+document.addEventListener('DOMContentLoaded', () => {
+    if (window.ui) {
+        window.app = new BookstoreApp();
+    } else {
+        console.error('UI module not found. Make sure ui.js is loaded correctly.');
+    }
+});
+
+
+===== static\js\members.js =====
+// static/js/members.js (全新內容)
+
+document.addEventListener('DOMContentLoaded', function() {
+    // DOM 元素
+    const newMemberBtn = document.getElementById('new-member-btn');
+    const memberModal = document.getElementById('member-modal');
+    const memberModalTitle = document.getElementById('member-modal-title');
+    const memberForm = document.getElementById('member-form');
+    const closeModalBtn = document.getElementById('close-member-modal');
+    const cancelFormBtn = document.getElementById('cancel-member-form');
+    const membersList = document.getElementById('members-list');
+    
+    let allMembers = [];
+
+    // 開啟 Modal
+    const openMemberModal = (member = null) => {
+        memberForm.reset();
+        document.getElementById('member-id').value = '';
+
+        if (member) {
+            // 編輯
+            memberModalTitle.textContent = '編輯會員';
+            document.getElementById('member-id').value = member.id;
+            document.getElementById('name').value = member.name || '';
+            document.getElementById('phone').value = member.phone || '';
+            document.getElementById('email').value = member.email || '';
+            document.getElementById('birthday').value = member.birthday || '';
+            document.getElementById('member-level').value = member.member_level || 'standard';
+            document.getElementById('status').value = member.status || 'active';
+            document.getElementById('address').value = member.address || '';
+            document.getElementById('notes').value = member.notes || '';
+        } else {
+            // 新增
+            memberModalTitle.textContent = '新增會員';
+        }
+        memberModal.classList.remove('hidden');
+    };
+    
+    // 關閉 Modal
+    const closeMemberModal = () => {
+        memberModal.classList.add('hidden');
+    };
+
+    // 載入會員資料
+    const loadMembers = async () => {
+        window.app.ui.showLoading('載入會員資料中...');
+        try {
+            const response = await fetch('/api/members');
+            if (!response.ok) throw new Error('無法載入會員資料');
+            allMembers = await response.json();
+            renderMembers(allMembers);
+        } catch (error) {
+            console.error('載入會員資料失敗:', error);
+            window.app.ui.showNotification('error', '載入會員資料失敗');
+        } finally {
+            window.app.ui.hideLoading();
+        }
+    };
+
+    // 渲染列表
+    const renderMembers = (members) => {
+        if (members.length === 0) {
+            membersList.innerHTML = `<tr><td colspan="8" class="text-center py-4">沒有會員資料</td></tr>`;
+            return;
+        }
+
+        membersList.innerHTML = members.map(member => {
+             const statusBadge = member.status === 'active' 
+                ? '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">啟用中</span>'
+                : '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">已停用</span>';
+            
+            return `
+                <tr data-id="${member.id}">
+                    <td class="px-6 py-4">${member.id}</td>
+                    <td class="px-6 py-4">${member.name}</td>
+                    <td class="px-6 py-4">${member.phone}</td>
+                    <td class="px-6 py-4">${member.email || '-'}</td>
+                    <td class="px-6 py-4">$${(member.total_spent || 0).toLocaleString()}</td>
+                    <td class="px-6 py-4">${member.member_level || 'standard'}</td>
+                    <td class="px-6 py-4">${statusBadge}</td>
+                    <td class="px-6 py-4 text-right">
+                        <button class="text-blue-600 hover:text-blue-900 edit-member"><i class="fas fa-edit"></i> 編輯</button>
+                        <button class="text-red-600 hover:text-red-900 ml-4 delete-member"><i class="fas fa-trash"></i> 刪除</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    };
+
+    // 處理表單提交
+    const handleFormSubmit = async (e) => {
+        e.preventDefault();
+        const memberId = document.getElementById('member-id').value;
+        const isEdit = !!memberId;
+        
+        const memberData = {
+            name: document.getElementById('name').value.trim(),
+            phone: document.getElementById('phone').value.trim(),
+            email: document.getElementById('email').value.trim(),
+            birthday: document.getElementById('birthday').value,
+            member_level: document.getElementById('member-level').value,
+            status: document.getElementById('status').value,
+            address: document.getElementById('address').value.trim(),
+            notes: document.getElementById('notes').value.trim(),
+        };
+
+        if (!memberData.name || !memberData.phone) {
+            window.app.ui.showNotification('error', '請填寫姓名與電話');
+            return;
+        }
+
+        const url = isEdit ? `/api/members/${memberId}` : '/api/members';
+        const method = isEdit ? 'PUT' : 'POST';
+
+        window.app.ui.showLoading('儲存中...');
+        try {
+            const response = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(memberData)
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.detail || '儲存失敗');
+            }
+
+            window.app.ui.showNotification('success', '會員資料儲存成功！');
+            closeMemberModal();
+            loadMembers();
+        } catch (error) {
+            console.error('儲存會員失敗:', error);
+            window.app.ui.showNotification('error', error.message);
+        } finally {
+            window.app.ui.hideLoading();
+        }
+    };
+    
+    // 處理列表點擊
+    const handleListClick = (e) => {
+        const target = e.target.closest('button');
+        if (!target) return;
+        
+        const row = target.closest('tr');
+        const memberId = row.dataset.id;
+        const member = allMembers.find(m => m.id === memberId);
+
+        if (target.classList.contains('edit-member')) {
+            if (member) openMemberModal(member);
+        }
+
+        if (target.classList.contains('delete-member')) {
+            window.app.ui.showConfirmDialog({
+                title: '確認刪除',
+                message: `您確定要刪除會員 "${member.name}" 嗎？`,
+            }).then(confirmed => {
+                if (confirmed) deleteMember(memberId);
+            });
+        }
+    };
+
+    // 刪除會員
+    const deleteMember = async (memberId) => {
+        window.app.ui.showLoading('刪除中...');
+        try {
+            const response = await fetch(`/api/members/${memberId}`, { method: 'DELETE' });
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.detail || '刪除失敗');
+            }
+            window.app.ui.showNotification('success', '會員已刪除');
+            loadMembers();
+        } catch (error) {
+            console.error('刪除會員失敗:', error);
+            window.app.ui.showNotification('error', error.message);
+        } finally {
+            window.app.ui.hideLoading();
+        }
+    };
+
+    // 設定事件監聽器
+    newMemberBtn.addEventListener('click', () => openMemberModal());
+    closeModalBtn.addEventListener('click', closeMemberModal);
+    cancelFormBtn.addEventListener('click', closeMemberModal);
+    memberForm.addEventListener('submit', handleFormSubmit);
+    membersList.addEventListener('click', handleListClick);
+
+    // 初始載入
+    loadMembers();
+});
+
+===== static\js\products.js =====
+// static/js/products.js - 完整商品管理功能
+
+document.addEventListener('DOMContentLoaded', () => {
+    // DOM 元素
+    const addProductBtn = document.getElementById('addProductBtn');
+    const productModal = document.getElementById('productModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const productForm = document.getElementById('productForm');
+    const saveProductBtn = document.getElementById('saveProductBtn');
+    const cancelProductBtn = document.getElementById('cancelProductBtn');
+    const productsTableBody = document.getElementById('productsTableBody');
+
+    // 篩選元素
+    const searchInput = document.getElementById('searchInput');
+    const categoryFilter = document.getElementById('categoryFilter');
+    const statusFilter = document.getElementById('statusFilter');
+    const supplierFilter = document.getElementById('supplierFilter');
+    const sortSelect = document.getElementById('sortSelect');
+
+    // 表單內元素
+    const supplierSelect = document.getElementById('supplier');
+    const costPriceInput = document.getElementById('costPrice');
+    const stockInput = document.getElementById('stock');
+
+    let allProducts = [];
+    let suppliers = [];
+
+    /** 顯示商品 Modal */
+    const showModal = (isEdit = false, product = null) => {
+        productForm.reset();
+        document.getElementById('productId').value = '';
+
+        if (isEdit && product) {
+            modalTitle.textContent = '編輯商品';
+            document.getElementById('productId').value = product.id;
+            document.getElementById('productName').value = product.name || '';
+            document.getElementById('category').value = product.category || '';
+            document.getElementById('supplier').value = product.supplier_id || '';
+            document.getElementById('costPrice').value = product.purchase_price || 0;
+            document.getElementById('salePrice').value = product.sale_price || 0;
+            document.getElementById('stock').value = product.stock || 0;
+            document.getElementById('minStock').value = product.min_stock || product.minStock || 5;
+            document.getElementById('unit').value = product.unit || '';
+            document.getElementById('description').value = product.description || '';
+            supplierSelect.disabled = true;
+            costPriceInput.disabled = true;
+            stockInput.disabled = true;
+        } else {
+            modalTitle.textContent = '新增商品';
+            supplierSelect.disabled = false;
+            costPriceInput.disabled = false;
+            stockInput.disabled = false;
+        }
+
+        productModal.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+    };
+
+    /** 關閉商品 Modal */
+    const closeModal = () => {
+        productModal.classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+    };
+
+    /** 載入供應商列表 */
+    const loadSuppliers = async () => {
+        try {
+            const res = await fetch('/api/suppliers');
+            if (res.ok) {
+                suppliers = await res.json();
+                const optionsHtml = suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+                supplierSelect.innerHTML = '<option value="">選擇供應商</option>' + optionsHtml;
+                supplierFilter.innerHTML = '<option value="">所有供應商</option>' + optionsHtml;
+            }
+        } catch (err) {
+            console.warn('載入供應商失敗', err);
+        }
+    };
+
+    /** 從 API 載入商品 */
+    const loadProducts = async () => {
+        window.app.ui.showLoading('載入商品中...');
+        try {
+            const res = await fetch('/api/products');
+            if (!res.ok) throw new Error('無法獲取商品列表');
+            allProducts = await res.json();
+            filterAndRender();
+        } catch (error) {
+            console.error('載入商品失敗:', error);
+            window.app.ui.showNotification('error', '載入商品失敗');
+        } finally {
+            window.app.ui.hideLoading();
+        }
+    };
+
+    /** 渲染商品表格 */
+    const renderTable = (products) => {
+        if (products.length === 0) {
+            productsTableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4">沒有商品資料</td></tr>`;
+            return;
+        }
+
+        productsTableBody.innerHTML = products.map(product => {
+            const stock = parseInt(product.stock, 10) || 0;
+            const min = parseInt(product.min_stock || product.minStock || 5, 10);
+            let statusBadge;
+            if (stock <= 0) {
+                statusBadge = '無庫存';
+            } else if (stock <= min) {
+                statusBadge = '低庫存';
+            } else {
+                statusBadge = '庫存正常';
+            }
+            const supplierName = suppliers.find(s => s.id === product.supplier_id)?.name || '-';
+            return `
+                <tr data-id="${product.id}">
+                    <td>${product.name}</td>
+                    <td>${product.category || '-'}</td>
+                    <td>${supplierName}</td>
+                    <td>${product.purchase_price || 0}</td>
+                    <td>${product.sale_price || 0}</td>
+                    <td>${stock}</td>
+                    <td>${statusBadge}</td>
+                    <td class="text-right text-sm font-medium">
+                        <button class="edit-btn text-blue-600 hover:underline">編輯</button>
+                    </td>
+                </tr>`;
+        }).join('');
+    };
+
+    /** 依搜尋與篩選條件顯示 */
+    const filterAndRender = () => {
+        const searchText = searchInput.value.trim().toLowerCase();
+        const category = categoryFilter.value;
+        const status = statusFilter.value;
+        const supplier = supplierFilter.value;
+        let filtered = allProducts.filter(p => {
+            const nameMatch = (p.name || '').toLowerCase().includes(searchText);
+            const matchSearch = nameMatch;
+            const matchCategory = !category || p.category === category;
+            const stock = parseInt(p.stock, 10) || 0;
+            const min = parseInt(p.min_stock || p.minStock || 5, 10);
+            let statusMatch = true;
+            if (status === 'in_stock') statusMatch = stock > min;
+            if (status === 'low_stock') statusMatch = stock > 0 && stock <= min;
+            if (status === 'out_of_stock') statusMatch = stock <= 0;
+            const supplierMatch = !supplier || p.supplier_id === supplier;
+            return matchSearch && matchCategory && statusMatch && supplierMatch;
+        });
+        const sortValue = sortSelect.value;
+        if (sortValue) {
+            const [field, direction] = sortValue.split('_');
+            filtered.sort((a, b) => {
+                const aVal = a[field] || 0;
+                const bVal = b[field] || 0;
+                if (aVal < bVal) return direction === 'asc' ? -1 : 1;
+                if (aVal > bVal) return direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        renderTable(filtered);
+    };
+
+    searchInput.addEventListener('input', filterAndRender);
+    categoryFilter.addEventListener('change', filterAndRender);
+    statusFilter.addEventListener('change', filterAndRender);
+    supplierFilter.addEventListener('change', filterAndRender);
+    sortSelect.addEventListener('change', filterAndRender);
+
+    /** API：新增商品 */
+    const createProduct = async (productData) => {
+        const res = await fetch('/api/products', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(productData)
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || '新增商品失敗');
+        }
+        return res.json();
+    };
+
+    /** API：更新商品 */
+    const updateProductApi = async (id, productData) => {
+        const res = await fetch(`/api/products/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(productData)
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || '更新商品失敗');
+        }
+        return res.json();
+    };
+
+    /** 處理表單提交 */
+    const handleFormSubmit = async () => {
+        const productId = document.getElementById('productId').value;
+        const isEdit = !!productId;
+        const formData = new FormData(productForm);
+        const productData = {
+            name: formData.get('productName').trim(),
+            category: formData.get('category'),
+            sale_price: parseFloat(formData.get('salePrice')) || 0,
+            min_stock: parseInt(formData.get('minStock'), 10) || 0,
+            unit: formData.get('unit').trim(),
+            description: formData.get('description').trim(),
+        };
+        if (!isEdit) {
+            productData.supplier_id = formData.get('supplier');
+            productData.purchase_price = parseFloat(formData.get('costPrice')) || 0;
+            productData.stock = parseInt(formData.get('stock'), 10) || 0;
+        }
+
+        window.app.ui.showLoading('儲存中...');
+        try {
+            if (isEdit) {
+                await updateProductApi(productId, productData);
+                window.app.ui.showNotification('success', '商品已更新');
+            } else {
+                await createProduct(productData);
+                window.app.ui.showNotification('success', '商品已新增');
+            }
+            await loadProducts();
+            closeModal();
+        } catch (error) {
+            console.error('儲存失敗:', error);
+            window.app.ui.showNotification('error', error.message);
+        } finally {
+            window.app.ui.hideLoading();
+        }
+    };
+
+    /** 處理表格中的點擊 (編輯/刪除) */
+    const handleTableClick = (e) => {
+        const target = e.target;
+        const row = target.closest('tr');
+        if (!row) return;
+        const productId = row.dataset.id;
+        const product = allProducts.find(p => p.id === productId);
+
+        if (target.closest('.edit-btn')) {
+            if (product) showModal(true, product);
+        }
+    };
+
+    // 事件監聽器
+    addProductBtn.addEventListener('click', () => showModal());
+    cancelProductBtn.addEventListener('click', closeModal);
+    saveProductBtn.addEventListener('click', handleFormSubmit);
+    productsTableBody.addEventListener('click', handleTableClick);
+
+    // 初始化
+    loadSuppliers();
+    loadProducts();
+});
+
+
+
+===== static\js\purchases.js =====
+// static/js/purchases.js (全新內容)
+
+document.addEventListener('DOMContentLoaded', function() {
+    // DOM 元素
+    const purchasesList = document.getElementById('purchases-list');
+    const newPurchaseBtn = document.getElementById('new-purchase-btn');
+    const purchaseDetailModal = document.getElementById('purchase-detail-modal');
+
+    let allPurchases = [];
+    let allSuppliers = [];
+
+    // 初始化
+    const init = async () => {
+        window.app.ui.showLoading('載入資料中...');
+        try {
+            await Promise.all([loadSuppliers(), loadPurchases()]);
+            renderPurchases(allPurchases);
+        } catch (error) {
+            console.error('初始化失敗:', error);
+            window.app.ui.showNotification('error', '頁面初始化失敗');
+        } finally {
+            window.app.ui.hideLoading();
+        }
+    };
+
+    // 載入供應商資料 (用於顯示名稱)
+    const loadSuppliers = async () => {
+        try {
+            const response = await fetch('/api/suppliers');
+            if (!response.ok) throw new Error('無法載入供應商');
+            allSuppliers = await response.json();
+        } catch (error) {
+            console.error(error);
+            // 即使供應商載入失敗，也繼續執行
+        }
+    };
+
+    // 載入進貨紀錄
+    const loadPurchases = async () => {
+        const response = await fetch('/api/purchases');
+        if (!response.ok) throw new Error('無法載入進貨紀錄');
+        const result = await response.json();
+        // API 回傳的資料結構是 { "data": [...] }
+        allPurchases = result.data || []; 
+    };
+
+    // 渲染進貨列表
+    const renderPurchases = (purchases) => {
+        if (!purchasesList) return;
+        if (purchases.length === 0) {
+            purchasesList.innerHTML = `<tr><td colspan="7" class="text-center py-4">沒有任何進貨紀錄</td></tr>`;
+            return;
+        }
+
+        purchasesList.innerHTML = purchases.map(purchase => {
+            const supplier = allSuppliers.find(s => s.id === purchase.supplier_id);
+            const supplierName = supplier ? supplier.name : '未知供應商';
+            const itemCount = purchase.items ? purchase.items.length : 0;
+            const statusMap = {
+                draft: { text: '草稿', color: 'bg-gray-100 text-gray-800' },
+                ordered: { text: '已訂購', color: 'bg-blue-100 text-blue-800' },
+                received: { text: '已到貨', color: 'bg-green-100 text-green-800' },
+                cancelled: { text: '已取消', color: 'bg-red-100 text-red-800' }
+            };
+            const statusInfo = statusMap[purchase.status] || { text: '未知', color: 'bg-gray-100' };
+            const statusBadge = `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusInfo.color}">${statusInfo.text}</span>`;
+
+            return `
+                <tr data-id="${purchase.id}">
+                    <td class="px-6 py-4 whitespace-nowrap text-blue-600 font-medium cursor-pointer view-details">${purchase.purchase_number || purchase.id}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">${supplierName}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">${itemCount} 項</td>
+                    <td class="px-6 py-4 whitespace-nowrap">$${(purchase.total || purchase.total_amount || 0).toLocaleString()}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">${new Date(purchase.purchase_date).toLocaleDateString()}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">${statusBadge}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <a href="/purchases/edit/${purchase.id}" class="text-indigo-600 hover:text-indigo-900"><i class="fas fa-edit"></i> 編輯</a>
+                        <button class="text-red-600 hover:text-red-900 ml-4 delete-purchase"><i class="fas fa-trash"></i> 刪除</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    };
+
+    // 顯示進貨明細 Modal
+    const viewPurchaseDetails = async (purchaseId) => {
+        window.app.ui.showLoading('載入明細中...');
+        try {
+            const response = await fetch(`/api/purchases/${purchaseId}`);
+            if (!response.ok) throw new Error('無法獲取明細');
+            const result = await response.json();
+            const purchase = result.data;
+            
+            const supplier = allSuppliers.find(s => s.id === purchase.supplier_id);
+            
+            // 填充 Modal 內容
+            document.getElementById('purchase-id').textContent = purchase.purchase_number || purchase.id;
+            document.getElementById('supplier-name').textContent = supplier ? supplier.name : '未知供應商';
+            document.getElementById('purchase-date').textContent = new Date(purchase.purchase_date).toLocaleString();
+            document.getElementById('purchase-status').textContent = purchase.status;
+            document.getElementById('purchase-notes').textContent = purchase.notes || '無';
+            
+            const itemsTbody = document.getElementById('purchase-items');
+            itemsTbody.innerHTML = purchase.items.map(item => `
+                <tr>
+                    <td class="px-3 py-2">${item.product_id}</td>
+                    <td class="px-3 py-2">${item.product_name}</td>
+                    <td class="px-3 py-2 text-center">$${item.unit_price.toLocaleString()}</td>
+                    <td class="px-3 py-2 text-center">${item.quantity}</td>
+                    <td class="px-3 py-2 text-right">$${(item.unit_price * item.quantity).toLocaleString()}</td>
+                </tr>
+            `).join('');
+            
+            // 計算總計
+            const subtotal = purchase.items.reduce((acc, item) => acc + item.unit_price * item.quantity, 0);
+            document.getElementById('purchase-subtotal').textContent = `$${subtotal.toLocaleString()}`;
+            document.getElementById('purchase-shipping').textContent = `$${(purchase.shipping_fee || 0).toLocaleString()}`;
+            document.getElementById('purchase-total').textContent = `$${(purchase.total || purchase.total_amount || 0).toLocaleString()}`;
+
+            // 顯示 Modal
+            purchaseDetailModal.classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+
+        } catch (error) {
+            console.error('顯示明細失敗:', error);
+            window.app.ui.showNotification('error', '無法顯示進貨明細');
+        } finally {
+            window.app.ui.hideLoading();
+        }
+    };
+    
+    // 刪除進貨單
+    const deletePurchase = async (purchaseId) => {
+        const confirmed = await window.app.ui.showConfirmDialog({ title: '確認刪除', message: '您確定要刪除這筆進貨單嗎？' });
+        if (!confirmed) return;
+
+        window.app.ui.showLoading('刪除中...');
+        try {
+            const response = await fetch(`/api/purchases/${purchaseId}`, { method: 'DELETE' });
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.detail || '刪除失敗');
+            }
+            window.app.ui.showNotification('success', '進貨單已刪除');
+            // 重新載入資料
+            await loadPurchases();
+            renderPurchases(allPurchases);
+        } catch (error) {
+            console.error('刪除失敗:', error);
+            window.app.ui.showNotification('error', error.message);
+        } finally {
+            window.app.ui.hideLoading();
+        }
+    };
+
+
+    // 設定事件監聽器
+    newPurchaseBtn.addEventListener('click', () => {
+        window.location.href = '/purchases/new';
+    });
+
+    purchasesList.addEventListener('click', (e) => {
+        const purchaseId = e.target.closest('tr').dataset.id;
+        if (e.target.closest('.view-details')) {
+            viewPurchaseDetails(purchaseId);
+        }
+        if (e.target.closest('.delete-purchase')) {
+            deletePurchase(purchaseId);
+        }
+    });
+
+    purchaseDetailModal.addEventListener('click', (e) => {
+        if (e.target.classList.contains('close-modal-btn') || e.target.closest('.close-modal-btn')) {
+            purchaseDetailModal.classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+        }
+    });
+
+    // 初始載入
+    init();
+});

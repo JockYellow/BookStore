@@ -45,5 +45,233 @@
     ],
     "notes": "非會員消費",
     "created_at": "2025-07-21T15:30:00Z"
+  },
+  {
+    "id": "S20250806142429",
+    "items": [
+      {
+        "product_id": "P102",
+        "quantity": 1,
+        "unit_price": 15
+      },
+      {
+        "product_id": "P002",
+        "quantity": 1,
+        "unit_price": 280
+      },
+      {
+        "product_id": "P101",
+        "quantity": 1,
+        "unit_price": 25
+      }
+    ],
+    "member_id": null,
+    "subtotal": 320.0,
+    "discount": 0.0,
+    "total": 320.0,
+    "payment_method": "cash",
+    "amount_received": 500.0,
+    "change": 180.0,
+    "created_at": "2025-08-06T14:24:29.132665",
+    "cashier": "系統管理員"
+  },
+  {
+    "id": "S20250806150921",
+    "items": [
+      {
+        "product_id": "P102",
+        "quantity": 1,
+        "unit_price": 15
+      }
+    ],
+    "member_id": null,
+    "subtotal": 15.0,
+    "discount": 0.0,
+    "total": 15.0,
+    "payment_method": "cash",
+    "amount_received": 100.0,
+    "change": 85.0,
+    "created_at": "2025-08-06T15:09:21.702525",
+    "cashier": "系統管理員"
+  },
+  {
+    "id": "S20250806150958",
+    "items": [
+      {
+        "product_id": "P002",
+        "quantity": 4,
+        "unit_price": 280
+      }
+    ],
+    "member_id": "M001",
+    "subtotal": 1120.0,
+    "discount": 0.0,
+    "total": 1120.0,
+    "payment_method": "cash",
+    "amount_received": 1500.0,
+    "change": 380.0,
+    "created_at": "2025-08-06T15:09:58.942926",
+    "cashier": "系統管理員"
+  },
+  {
+    "id": "S20250806151150",
+    "items": [
+      {
+        "product_id": "P101",
+        "quantity": 4,
+        "unit_price": 25
+      }
+    ],
+    "member_id": null,
+    "subtotal": 100.0,
+    "discount": 0.0,
+    "total": 100.0,
+    "payment_method": "cash",
+    "amount_received": 1000.0,
+    "change": 900.0,
+    "created_at": "2025-08-06T15:11:50.046670",
+    "cashier": "系統管理員"
+  },
+  {
+    "id": "S20250806151607",
+    "items": [
+      {
+        "product_id": "P102",
+        "quantity": 3,
+        "unit_price": 15
+      }
+    ],
+    "member_id": "M0002",
+    "subtotal": 45.0,
+    "discount": 0.0,
+    "total": 45.0,
+    "payment_method": "cash",
+    "amount_received": 45.0,
+    "change": 0.0,
+    "created_at": "2025-08-06T15:16:07.587659",
+    "cashier": "系統管理員"
+  },
+  {
+    "id": "S20250806151744",
+    "items": [
+      {
+        "product_id": "P102",
+        "quantity": 1,
+        "unit_price": 15
+      },
+      {
+        "product_id": "P402",
+        "quantity": 2,
+        "unit_price": 220
+      },
+      {
+        "product_id": "P401",
+        "quantity": 1,
+        "unit_price": 180
+      },
+      {
+        "product_id": "P101",
+        "quantity": 1,
+        "unit_price": 25
+      }
+    ],
+    "member_id": "M0002",
+    "subtotal": 660.0,
+    "discount": 0.0,
+    "total": 660.0,
+    "payment_method": "cash",
+    "amount_received": 660.0,
+    "change": 0.0,
+    "created_at": "2025-08-06T15:17:44.527822",
+    "cashier": "系統管理員"
+  },
+  {
+    "id": "S20250806161012",
+    "items": [
+      {
+        "product_id": "P401",
+        "quantity": 5,
+        "unit_price": 180
+      }
+    ],
+    "member_id": "M0002",
+    "subtotal": 900.0,
+    "discount": 0.0,
+    "total": 900.0,
+    "payment_method": "cash",
+    "amount_received": 1000.0,
+    "change": 100.0,
+    "manual_discount_type": null,
+    "manual_discount_value": 0.0,
+    "created_at": "2025-08-06T16:10:12.664988",
+    "cashier": "系統管理員"
+  },
+  {
+    "id": "S20250806161208",
+    "items": [
+      {
+        "product_id": "P402",
+        "quantity": 1,
+        "unit_price": 220
+      }
+    ],
+    "member_id": null,
+    "subtotal": 220.0,
+    "discount": 0.0,
+    "total": 220.0,
+    "payment_method": "line_pay",
+    "amount_received": 500.0,
+    "change": 280.0,
+    "manual_discount_type": null,
+    "manual_discount_value": 0.0,
+    "created_at": "2025-08-06T16:12:08.956724",
+    "cashier": "系統管理員"
+  },
+  {
+    "id": "S20250806170726",
+    "items": [
+      {
+        "product_id": "P402",
+        "quantity": 1,
+        "unit_price": 220
+      }
+    ],
+    "member_id": null,
+    "subtotal": 220.0,
+    "discount": 0.0,
+    "total": 220.0,
+    "payment_method": "cash",
+    "amount_received": 300.0,
+    "change": 80.0,
+    "manual_discount_type": null,
+    "manual_discount_value": 0.0,
+    "created_at": "2025-08-06T17:07:26.488118",
+    "cashier": "系統管理員"
+  },
+  {
+    "id": "S20250806170820",
+    "items": [
+      {
+        "product_id": "P102",
+        "quantity": 1,
+        "unit_price": 15
+      },
+      {
+        "product_id": "P101",
+        "quantity": 1,
+        "unit_price": 25
+      }
+    ],
+    "member_id": null,
+    "subtotal": 40.0,
+    "discount": 0.0,
+    "total": 40.0,
+    "payment_method": "cash",
+    "amount_received": 50.0,
+    "change": 10.0,
+    "manual_discount_type": null,
+    "manual_discount_value": 0.0,
+    "created_at": "2025-08-06T17:08:20.270438",
+    "cashier": "系統管理員"
   }
 ]

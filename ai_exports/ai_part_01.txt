@@ -1,0 +1,2794 @@
+
+
+===== app.py =====
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+from datetime import datetime, timedelta
+import json
+from pathlib import Path
+from typing import Dict, List, Optional
+
+# 設置頁面配置
+st.set_page_config(
+    page_title="書房記帳與營運管理系統",
+    page_icon="📚",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# 初始化 session state
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = 'dashboard'
+
+# 數據文件夾
+DATA_DIR = Path("data")
+DATA_DIR.mkdir(exist_ok=True)
+
+# 加載數據
+def load_data(collection_name: str) -> Dict:
+    file_path = DATA_DIR / f"{collection_name}.json"
+    if file_path.exists():
+        with open(file_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
+
+# 保存數據
+def save_data(collection_name: str, data: Dict):
+    file_path = DATA_DIR / f"{collection_name}.json"
+    with open(file_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+# 側邊欄 - 導航
+with st.sidebar:
+    st.title("📚 書房管理系統")
+    st.write("---")
+    
+    menu = ["儀表板", "商品管理", "進貨管理", "銷售管理", "會員管理", "供應商管理", "報表分析"]
+    for i, item in enumerate(menu):
+        if st.button(item, key=f"menu_{i}", use_container_width=True):
+            st.session_state.current_page = item
+    
+    st.write("---")
+    st.caption(f"版本: 1.0.0")
+
+# 儀表板頁面
+if st.session_state.current_page == "儀表板":
+    st.title("📊 儀表板")
+    
+    # 獲取銷售數據
+    sales = load_data("sales")
+    products = load_data("products")
+    
+    # 計算今日銷售額
+    today = datetime.now().strftime("%Y-%m-%d")
+    today_sales = [s for s in sales.values() if s.get('sale_date', '').startswith(today)]
+    
+    # 計算指標
+    total_sales_today = sum(s.get('final_amount', 0) for s in today_sales)
+    total_orders_today = len(today_sales)
+    
+    # 顯示 KPI 卡片
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("今日銷售額", f"${total_sales_today:,.0f}")
+    with col2:
+        st.metric("今日訂單數", total_orders_today)
+    with col3:
+        avg_order = total_sales_today / total_orders_today if total_orders_today > 0 else 0
+        st.metric("平均訂單價值", f"${avg_order:,.0f}" if avg_order > 0 else "$0")
+    
+    st.write("---")
+    
+    # 銷售趨勢圖
+    st.subheader("銷售趨勢")
+    
+    # 獲取最近30天的銷售數據
+    date_range = pd.date_range(end=datetime.now(), periods=30).date
+    sales_by_date = {}
+    
+    for date in date_range:
+        date_str = date.strftime("%Y-%m-%d")
+        daily_sales = [s for s in sales.values() if s.get('sale_date', '').startswith(date_str)]
+        sales_by_date[date_str] = sum(s.get('final_amount', 0) for s in daily_sales)
+    
+    # 創建折線圖
+    df_sales = pd.DataFrame({
+        '日期': list(sales_by_date.keys()),
+        '銷售額': list(sales_by_date.values())
+    })
+    
+    fig = px.line(df_sales, x='日期', y='銷售額', title='最近30天銷售趨勢')
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # 低庫存商品提醒
+    st.subheader("低庫存提醒")
+    low_stock_products = [p for p in products.values() if p.get('stock', 0) < 5]
+    
+    if low_stock_products:
+        for product in low_stock_products:
+            st.warning(f"{product.get('name')} 庫存不足: {product.get('stock', 0)} 件")
+    else:
+        st.success("目前沒有低庫存商品")
+    
+    # 最近交易記錄
+    st.subheader("最近交易")
+    recent_sales = sorted(sales.values(), key=lambda x: x.get('sale_date', ''), reverse=True)[:5]
+    
+    if recent_sales:
+        for sale in recent_sales:
+            st.write(f"**{sale.get('sale_date', '')}** - ${sale.get('final_amount', 0):,.0f}")
+    else:
+        st.info("暫無交易記錄")
+
+# 商品管理頁面
+elif st.session_state.current_page == "商品管理":
+    st.title("📦 商品管理")
+    
+    # 加載商品數據
+    products = load_data("products")
+    
+    # 添加新商品
+    with st.expander("添加新商品", expanded=False):
+        with st.form("add_product_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                name = st.text_input("商品名稱*")
+                category = st.text_input("商品分類")
+            with col2:
+                cost_price = st.number_input("成本價", min_value=0.0, value=0.0, step=1.0)
+                selling_price = st.number_input("售價", min_value=0.0, value=0.0, step=1.0)
+                stock = st.number_input("庫存數量", min_value=0, value=0, step=1)
+            
+            note = st.text_area("備註")
+            
+            if st.form_submit_button("保存商品"):
+                if not name:
+                    st.error("商品名稱不能為空")
+                else:
+                    new_product = {
+                        'id': str(len(products) + 1),
+                        'name': name,
+                        'category': category,
+                        'cost_price': cost_price,
+                        'selling_price': selling_price,
+                        'stock': stock,
+                        'note': note,
+                        'created_at': datetime.now().isoformat(),
+                        'updated_at': datetime.now().isoformat()
+                    }
+                    products[new_product['id']] = new_product
+                    save_data("products", products)
+                    st.success(f"商品 '{name}' 已成功添加！")
+                    st.rerun()
+    
+    # 商品列表
+    st.subheader("商品列表")
+    
+    if products:
+        # 轉換為 DataFrame 顯示
+        df_products = pd.DataFrame([{
+            'ID': p['id'],
+            '商品名稱': p.get('name', ''),
+            '分類': p.get('category', ''),
+            '成本價': p.get('cost_price', 0),
+            '售價': p.get('selling_price', 0),
+            '庫存': p.get('stock', 0),
+            '更新日期': p.get('updated_at', '').split('T')[0]
+        } for p in products.values()])
+        
+        st.dataframe(
+            df_products,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "成本價": st.column_config.NumberColumn(format="$%.2f"),
+                "售價": st.column_config.NumberColumn(format="$%.2f")
+            }
+        )
+    else:
+        st.info("暫無商品數據")
+
+# 其他頁面的實現...
+elif st.session_state.current_page == "供應商管理":
+    st.title("📦 供應商管理")
+
+    suppliers = load_data("suppliers")
+    products = load_data("products")
+    sales_data = load_data("sales")
+    sales = sales_data.get("sales", sales_data if isinstance(sales_data, list) else [])
+
+    product_supplier = {p.get('id'): p.get('supplier_id') for p in products}
+    supplier_map = {s.get('id'): s.get('name') for s in suppliers}
+
+    col1, col2 = st.columns(2)
+    with col1:
+        start_date = st.date_input("開始日期", value=datetime.now() - timedelta(days=30))
+    with col2:
+        end_date = st.date_input("結束日期", value=datetime.now())
+
+    def parse_date(date_str: str):
+        try:
+            return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        except Exception:
+            return None
+
+    filtered_sales = []
+    for s in sales:
+        dt = parse_date(s.get('sale_date', ''))
+        if dt and start_date <= dt.date() <= end_date:
+            filtered_sales.append(s)
+
+    stats = {sid: {'name': supplier_map.get(sid, sid), 'quantity': 0, 'amount': 0.0} for sid in supplier_map}
+
+    for sale in filtered_sales:
+        for item in sale.get('items', []):
+            supplier_id = product_supplier.get(item.get('product_id'))
+            if not supplier_id:
+                continue
+            q = item.get('quantity', 0)
+            subtotal = item.get('subtotal')
+            if subtotal is None:
+                subtotal = item.get('unit_price', 0) * q - item.get('discount', 0)
+            stats[supplier_id]['quantity'] += q
+            stats[supplier_id]['amount'] += subtotal
+
+    df = pd.DataFrame([
+        {'供應商': v['name'], '銷售數量': v['quantity'], '銷售金額': v['amount']}
+        for v in stats.values()
+    ])
+
+    st.subheader("期間銷售彙總")
+    st.dataframe(df, use_container_width=True, hide_index=True,
+                 column_config={'銷售金額': st.column_config.NumberColumn(format="$%.2f")})
+else:
+    st.title(st.session_state.current_page)
+    st.write("開發中...")
+
+# 頁腳
+st.write("---")
+st.caption("© 2025 書房記帳與營運管理系統 - 版本 1.0.0")
+
+
+===== build_static.py =====
+import json
+import os
+import shutil
+import re
+from datetime import datetime
+from pathlib import Path
+
+from jinja2 import Environment, FileSystemLoader
+
+# --- 設定 ---
+# 專案根目錄
+ROOT_DIR = Path(__file__).parent
+# 靜態網站輸出目錄
+DIST_DIR = ROOT_DIR / "docs"
+# 原始資料目錄
+DATA_DIR = ROOT_DIR / "data"
+# 原始靜態資源目錄 (CSS, JS)
+STATIC_DIR = ROOT_DIR / "static"
+# 原始 Jinja 模板目錄
+TEMPLATES_DIR = ROOT_DIR / "templates"
+
+
+def setup_dist_directory():
+    """建立一個乾淨的輸出目錄"""
+    print(f"1. 正在清理並建立輸出目錄: {DIST_DIR}")
+    if DIST_DIR.exists():
+        shutil.rmtree(DIST_DIR)
+    DIST_DIR.mkdir(exist_ok=True)
+    print("   ✅ 輸出目錄已準備就緒。")
+
+
+def process_and_copy_assets():
+    """
+    複製靜態資源並對 JavaScript 檔案進行全面改造，以適應靜態網站的互動模擬。
+    """
+    print("2. 正在處理與複製靜態資源...")
+    dist_static_dir = DIST_DIR / "static"
+    shutil.copytree(STATIC_DIR, dist_static_dir, dirs_exist_ok=True)
+
+    js_dir = dist_static_dir / "js"
+    if not js_dir.exists():
+        print("   ⚠️ 未找到 JavaScript 目錄，跳過處理。")
+        return
+
+    print("   正在全面改造 JavaScript 檔案以適應靜態模式...")
+    for js_file in js_dir.glob("*.js"):
+        content = js_file.read_text("utf-8")
+        
+        # --- 步驟 1: API 路徑替換 (用於初始資料載入) ---
+        content = re.sub(r"/api/(\w+)/overview", r"./data/reports.json", content)
+        content = re.sub(r"/api/(\w+)", r"./data/\1.json", content)
+
+        # --- 步驟 2: 修正 purchases.js 的資料讀取問題 ---
+        if js_file.name == 'purchases.js':
+            content = content.replace('result.data', 'result')
+            print(f"   - 已修正 {js_file.name} 的資料讀取邏輯。")
+
+        # --- 步驟 3: 注入前端互動模擬程式碼 ---
+        
+        # 移除異步關鍵字 `async`，因為不再有實際的 await
+        content = re.sub(r'const handle.*? = async \(.*?\)', lambda m: m.group(0).replace('async ', ''), content)
+        content = re.sub(r'const processCheckout = async \(\)', 'const processCheckout = ()', content)
+        content = re.sub(r'const delete.*? = async \(.*?\)', lambda m: m.group(0).replace('async ', ''), content)
+
+        # 模擬 suppliers.js 的新增/編輯
+        if js_file.name == 'suppliers.js':
+            submit_pattern = re.compile(r"const handleSubmitSupplier = \((?:.|\n)*?\{((?:.|\n)*?)\};", re.MULTILINE)
+            delete_pattern = re.compile(r"const deleteSupplier = \((?:.|\n)*?\{((?:.|\n)*?)\};", re.MULTILINE)
+            
+            content = submit_pattern.sub(r"""
+    const handleSubmitSupplier = (e) => {
+        e.preventDefault();
+        const supplierId = supplierForm.dataset.id;
+        const isEdit = !!supplierId;
+        const supplierData = {
+            id: supplierId || `S_NEW_${Date.now()}`,
+            name: document.getElementById('supplier-name').value.trim(),
+            contact_person: document.getElementById('contact-person').value.trim(),
+            phone: document.getElementById('phone').value.trim(),
+            payment_terms: document.getElementById('payment-terms').value,
+            created_at: new Date().toISOString()
+        };
+        if (!supplierData.name || !supplierData.contact_person || !supplierData.phone) {
+            window.app.ui.showNotification('error', '請填寫所有必填欄位 (*)');
+            return;
+        }
+        if (isEdit) {
+            const index = allSuppliers.findIndex(s => s.id === supplierId);
+            if (index !== -1) allSuppliers[index] = { ...allSuppliers[index], ...supplierData };
+        } else {
+            allSuppliers.unshift(supplierData);
+        }
+        renderSuppliers(allSuppliers);
+        closeSupplierModal();
+        window.app.ui.showNotification('success', '供應商資料已成功模擬儲存！');
+    };
+            """, content)
+            
+            content = delete_pattern.sub(r"""
+    const deleteSupplier = (supplierId) => {
+        allSuppliers = allSuppliers.filter(s => s.id !== supplierId);
+        renderSuppliers(allSuppliers);
+        window.app.ui.showNotification('success', '供應商已模擬刪除');
+    };
+            """, content)
+            print(f"   - 已注入 {js_file.name} 的互動模擬功能。")
+
+        # 模擬 members.js 的新增/編輯
+        if js_file.name == 'members.js':
+            content = re.sub(r"const handleFormSubmit = async \((?:.|\n)*?\{((?:.|\n)*?)\};", r"""
+    const handleFormSubmit = (e) => {
+        e.preventDefault();
+        const memberId = document.getElementById('member-id').value;
+        const isEdit = !!memberId;
+        const memberData = {
+            id: memberId || `M_NEW_${Date.now()}`,
+            name: document.getElementById('name').value.trim(),
+            phone: document.getElementById('phone').value.trim(),
+            email: document.getElementById('email').value.trim(),
+            total_spent: isEdit ? (allMembers.find(m => m.id === memberId).total_spent || 0) : 0,
+            member_level: document.getElementById('member-level').value,
+            status: document.getElementById('status').value
+        };
+        if (!memberData.name || !memberData.phone) {
+            window.app.ui.showNotification('error', '請填寫姓名與電話');
+            return;
+        }
+        if (isEdit) {
+            const index = allMembers.findIndex(m => m.id === memberId);
+            if (index !== -1) allMembers[index] = { ...allMembers[index], ...memberData };
+        } else {
+            allMembers.unshift(memberData);
+        }
+        renderMembers(allMembers);
+        closeMemberModal();
+        window.app.ui.showNotification('success', '會員資料已成功模擬儲存！');
+    };
+            """, content, flags=re.MULTILINE)
+            content = re.sub(r"const deleteMember = async \((?:.|\n)*?\{((?:.|\n)*?)\};", r"""
+    const deleteMember = (memberId) => {
+        allMembers = allMembers.filter(m => m.id !== memberId);
+        renderMembers(allMembers);
+        window.app.ui.showNotification('success', '會員已模擬刪除');
+    };
+            """, content, flags=re.MULTILINE)
+            print(f"   - 已注入 {js_file.name} 的互動模擬功能。")
+        
+        # 模擬 sales.js 的結帳
+        if js_file.name == 'sales.js':
+            content = re.sub(r'const processCheckout = \(\) => \{((?:.|\n)*?)\};', r"""
+    const processCheckout = () => {
+        window.app.ui.showLoading('結帳中...');
+        setTimeout(() => {
+            window.app.ui.hideLoading();
+            window.app.ui.showNotification('success', '結帳成功！');
+            cart = [];
+            updateCartUI();
+            checkoutModal.classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+        }, 800);
+    };
+            """, content, flags=re.MULTILINE)
+            print(f"   - 已注入 {js_file.name} 的互動模擬功能。")
+
+        js_file.write_text(content, "utf-8")
+
+    print("   ✅ 靜態資源處理與複製完成。")
+
+
+def copy_data_files():
+    """將 data 目錄下的 JSON 檔案複製到 dist/data 目錄，並提取陣列。"""
+    print("3. 正在複製資料檔案...")
+    dist_data_dir = DIST_DIR / "data"
+    dist_data_dir.mkdir(exist_ok=True)
+
+    for json_file in DATA_DIR.glob("*.json"):
+        with open(json_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        if isinstance(data, dict) and len(data) == 1 and isinstance(list(data.values())[0], list):
+            key = list(data.keys())[0]
+            print(f"   - 正在提取 {json_file.name} 中的 '{key}' 陣列...")
+            data = data[key]
+        
+        elif json_file.name == "members.json" and isinstance(data, list) and data and 'members' in data[0]:
+             print(f"   - 正在處理 {json_file.name} 的特殊結構...")
+             processed_data = []
+             for item in data:
+                 if 'members' in item and isinstance(item['members'], list):
+                     processed_data.extend(item['members'])
+                 else:
+                     processed_data.append(item)
+             data = processed_data
+
+        (dist_data_dir / json_file.name).write_text(
+            json.dumps(data, ensure_ascii=False, indent=2),
+            encoding='utf-8'
+        )
+        print(f"   - 已複製並處理 {json_file.name}")
+        
+    print("   ✅ 資料檔案複製完成。")
+
+
+def render_and_fix_html_pages():
+    """渲染模板、儲存為 HTML，並修正內部連結與資源路徑。"""
+    print("4. 正在渲染並修正 HTML 頁面...")
+    env = Environment(loader=FileSystemLoader(TEMPLATES_DIR), autoescape=True)
+
+    pages_to_render = {
+        "index.html": {"title": "儀表板"}, "products.html": {"title": "商品管理"},
+        "suppliers.html": {"title": "供應商管理"}, "purchases.html": {"title": "進貨管理"},
+        "purchase_form.html": {"title": "新增進貨單", "today": datetime.now().strftime("%Y-%m-%d")},
+        "sales.html": {"title": "銷售管理"}, "members.html": {"title": "會員管理"},
+        "reports.html": {"title": "報表分析"},
+    }
+
+    for template_name, context in pages_to_render.items():
+        template = env.get_template(template_name)
+        rendered_html = template.render({"request": None, **context})
+        
+        # 將所有絕對路徑改為相對路徑
+        rendered_html = re.sub(r'(href|src)="/', r'\1="./', rendered_html)
+        rendered_html = re.sub(r'href="./(?!static)([^"]+)"', r'href="./\1.html"', rendered_html)
+        rendered_html = re.sub(r'href="./index.html"', 'href="./index.html"', rendered_html) 
+        rendered_html = re.sub(r'href="./purchases/new.html"', 'href="./purchase_form.html"', rendered_html)
+
+        (DIST_DIR / template_name).write_text(rendered_html, encoding="utf-8")
+        print(f"   - 已渲染並修正 {template_name}")
+        
+    print("   ✅ HTML 頁面處理完成。")
+
+
+def main():
+    """主執行函數"""
+    print("🚀 開始建立靜態網站...")
+    
+    setup_dist_directory()
+    process_and_copy_assets()
+    copy_data_files()
+    render_and_fix_html_pages()
+    
+    print("\n✅ 靜態網站建立成功！")
+    print(f"   所有檔案都已生成在 '{DIST_DIR.name}' 目錄中。")
+    print("   JS 檔案已自動改造，現在可以完整模擬新增、編輯、刪除的互動效果。")
+
+
+if __name__ == "__main__":
+    main()
+
+===== init_data.py =====
+from main import initialize_data_files
+
+if __name__ == '__main__':
+    initialize_data_files()
+    print("Data files initialized.")
+
+
+===== main.py =====
+try:
+    from fastapi import FastAPI, HTTPException, Request, Depends, status
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+    from fastapi.templating import Jinja2Templates
+    from fastapi.middleware.cors import CORSMiddleware
+    HAS_FASTAPI = True
+except ModuleNotFoundError:  # pragma: no cover - fallback for test envs
+    HAS_FASTAPI = False
+    HTTPException = Exception
+
+    class Dummy:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    Request = Depends = status = Dummy
+    StaticFiles = Dummy
+    FileResponse = HTMLResponse = JSONResponse = Dummy
+    Jinja2Templates = Dummy
+    CORSMiddleware = Dummy
+
+    class DummyFastAPI:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def add_middleware(self, *args, **kwargs):
+            pass
+
+        def mount(self, *args, **kwargs):
+            pass
+
+        def get(self, *args, **kwargs):
+            def decorator(func):
+                return func
+            return decorator
+
+        def post(self, *args, **kwargs):
+            def decorator(func):
+                return func
+            return decorator
+
+        def put(self, *args, **kwargs):
+            def decorator(func):
+                return func
+            return decorator
+
+        def delete(self, *args, **kwargs):
+            def decorator(func):
+                return func
+            return decorator
+
+    FastAPI = DummyFastAPI
+from pathlib import Path
+try:
+    import uvicorn
+except ModuleNotFoundError:  # pragma: no cover - optional in tests
+    uvicorn = None
+from typing import Dict, List, Optional, Any
+import json
+from datetime import datetime
+import os
+from services.report_service import ReportService
+from utils import validate_required_fields
+import logging
+
+# 配置日誌
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# 初始化 FastAPI 應用
+app = FastAPI(title="書房記帳與營運管理系統")
+
+# 添加 CORS 中間件
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 確保數據目錄存在
+data_dir = Path("data")
+data_dir.mkdir(exist_ok=True)
+
+# 設置靜態文件目錄
+static_dir = Path("static")
+static_dir.mkdir(exist_ok=True)
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+# 設置模板目錄
+templates_dir = Path("templates")
+templates_dir.mkdir(exist_ok=True)
+try:
+    templates = Jinja2Templates(directory=templates_dir)
+except Exception:  # pragma: no cover - allow tests without jinja2
+    templates = None
+
+# 數據目錄
+DATA_DIR = Path("data")
+DATA_DIR.mkdir(exist_ok=True)
+
+# 初始化數據文件
+DATA_FILES = ["products", "suppliers", "purchases", "sales", "members", "payments", "discounts"]
+
+def initialize_data_files():
+    """確保所有需要的數據文件都存在且為有效JSON"""
+    for file_name in DATA_FILES:
+        file_path = DATA_DIR / f"{file_name}.json"
+        if not file_path.exists():
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump([], f, ensure_ascii=False, indent=2)
+            logger.info(f"Created empty data file: {file_path}")
+        else:
+            # 檢查文件是否為有效的JSON
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    json.load(f)
+            except json.JSONDecodeError:
+                logger.warning(f"Invalid JSON in {file_path}, resetting to empty list")
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    json.dump([], f, ensure_ascii=False, indent=2)
+
+# 應用啟動時初始化數據文件
+initialize_data_files()
+
+# 加載數據
+def load_data(collection_name: str) -> List[Dict]:
+    """Load data from a JSON file and ensure it's a list."""
+    file_path = DATA_DIR / f"{collection_name}.json"
+    if file_path.exists():
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    # handle legacy structure like {"sales": [...]} or {"members": [...]}  
+                    if len(data) == 1 and isinstance(next(iter(data.values())), list):
+                        logger.info(f"Extracting array from wrapper in {file_path}")
+                        data = next(iter(data.values()))
+                    else:
+                        logger.warning(f"Data in {file_path} is a dict, converting values to list")
+                        data = [data]
+                if not isinstance(data, list):
+                    logger.warning(f"Data in {file_path} is not a list, converting to list")
+                    data = [data] if data else []
+                return data
+        except json.JSONDecodeError as e:
+            logger.error(f"Error loading {file_path}: {e}")
+            return []
+    return []
+
+# 保存數據
+def save_data(collection_name: str, data: List[Dict]):
+    """Save data to a JSON file, ensuring it's a list."""
+    file_path = DATA_DIR / f"{collection_name}.json"
+    try:
+        # Ensure the directory exists
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        # Ensure data is a list
+        if not isinstance(data, list):
+            logger.warning(f"Data for {collection_name} is not a list, converting to list")
+            data = [data] if data else []
+        # Save with pretty print
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2, default=str)
+    except Exception as e:
+        logger.error(f"Error saving {file_path}: {e}")
+        raise
+
+# 首頁
+@app.get("/", response_class=HTMLResponse)
+async def read_root(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request, "title": "首頁"})
+
+# 商品頁面
+@app.get("/products", response_class=HTMLResponse)
+async def products_page(request: Request):
+    return templates.TemplateResponse("products.html", {
+        "request": request,
+        "title": "商品管理"
+    })
+
+# 供應商頁面
+@app.get("/suppliers", response_class=HTMLResponse)
+async def suppliers_page(request: Request):
+    return templates.TemplateResponse("suppliers.html", {
+        "request": request, 
+        "title": "供應商管理"
+    })
+    
+# 進貨頁面
+@app.get("/purchases", response_class=HTMLResponse)
+async def purchases_page(request: Request):
+    return templates.TemplateResponse("purchases.html", {
+        "request": request,
+        "title": "進貨管理"
+    })
+
+@app.get("/purchases/new", response_class=HTMLResponse)
+async def new_purchase_page(request: Request):
+    return templates.TemplateResponse("purchase_form.html", {
+        "request": request,
+        "title": "新增進貨單",
+        "today": datetime.now().strftime("%Y-%m-%d")
+    })
+
+# 會員頁面
+@app.get("/members", response_class=HTMLResponse)
+async def members_page(request: Request):
+    return templates.TemplateResponse("members.html", {
+        "request": request,
+        "title": "會員管理"
+    })
+
+# 報表分析頁面
+@app.get("/reports", response_class=HTMLResponse)
+async def reports_page(request: Request):
+    """顯示簡易報表分析介面"""
+    return templates.TemplateResponse("reports.html", {
+        "request": request,
+        "title": "報表分析"
+    })
+
+# 商品相關 API
+@app.get("/api/products")
+async def get_products(supplier_id: str | None = None, sort_by: str | None = None, order: str = "asc"):
+    """取得商品列表，支援按供應商篩選與排序"""
+    products = load_data("products") or []
+
+    if supplier_id:
+        products = [p for p in products if p.get("supplier_id") == supplier_id]
+
+    if sort_by:
+        reverse = (order == "desc")
+        products.sort(
+            key=lambda x: x.get(sort_by) if isinstance(x.get(sort_by), (int, float)) else str(x.get(sort_by, "")),
+            reverse=reverse,
+        )
+
+    return products
+
+@app.get("/api/products/{product_id}")
+async def get_product(product_id: str):
+    products = load_data("products")
+    product = next((p for p in products if p["id"] == product_id), None)
+    if not product:
+        raise HTTPException(status_code=404, detail="商品不存在")
+    return product
+
+@app.post("/api/products")
+async def create_product(product: dict):
+    products = load_data("products")
+    if not isinstance(products, list):
+        products = []
+    product["id"] = f"P{len(products) + 1:03d}"
+    product["created_at"] = datetime.now().isoformat()
+    product["updated_at"] = datetime.now().isoformat()
+    products.append(product)
+    save_data("products", products)
+    return {"message": "商品新增成功", "id": product["id"]}
+
+@app.put("/api/products/{product_id}")
+async def update_product(product_id: str, product_data: dict):
+    products = load_data("products")
+    if not isinstance(products, list):
+        products = []
+
+    product_index = next((i for i, p in enumerate(products) if p["id"] == product_id), None)
+    if product_index is None:
+        raise HTTPException(status_code=404, detail="商品不存在")
+
+    existing = products[product_index]
+
+    # 僅允許修改特定欄位，庫存、成本及供應商不可變動
+    allowed_fields = {"name", "category", "sale_price", "description", "unit", "min_stock"}
+    for field in allowed_fields:
+        if field in product_data:
+            existing[field] = product_data[field]
+
+    existing["created_at"] = existing.get("created_at", datetime.now().isoformat())
+    existing["updated_at"] = datetime.now().isoformat()
+
+    products[product_index] = existing
+    save_data("products", products)
+    return {"message": "商品更新成功", "id": product_id}
+
+@app.delete("/api/products/{product_id}")
+async def delete_product(product_id: str):
+    """商品不可刪除"""
+    raise HTTPException(status_code=405, detail="商品不可刪除")
+
+# 銷售相關 API
+@app.get("/sales", response_class=HTMLResponse)
+async def sales_page(request: Request):
+    return templates.TemplateResponse("sales.html", {
+        "request": request,
+        "title": "銷售管理"
+    })
+
+# 銷售記錄頁面
+@app.get("/sales/history", response_class=HTMLResponse)
+async def sales_history_page(request: Request):
+    return templates.TemplateResponse("sales_history.html", {
+        "request": request,
+        "title": "銷售記錄"
+    })
+
+@app.get("/api/sales")
+async def get_sales():
+    sales_data = load_data("sales")
+    # 確保返回的是列表
+    if isinstance(sales_data, dict) and 'sales' in sales_data:
+        return sales_data['sales']
+    return sales_data or []
+
+@app.get("/api/sales/{sale_id}")
+async def get_sale(sale_id: str):
+    sales = load_data("sales")
+    sale = next((s for s in sales if s.get("id") == sale_id), None)
+    if not sale:
+        raise HTTPException(status_code=404, detail="銷售記錄不存在")
+    return sale
+
+@app.post("/api/sales")
+async def create_sale(sale: dict):
+    sales = load_data("sales")
+    products = load_data("products")
+    discounts = load_data("discounts")
+
+    error = validate_required_fields(sale, ["items"])
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    if not isinstance(sale["items"], list) or not sale["items"]:
+        raise HTTPException(status_code=400, detail="銷售項目不能為空")
+
+    now = datetime.now()
+    sale_id = f"S{now.strftime('%Y%m%d%H%M%S')}"
+
+    def calc_discount(pid: str, qty: int, price: float) -> float:
+        applicable = [d for d in discounts if d.get("target_type") == "product" and d.get("target_id") == pid]
+        product = next((p for p in products if p["id"] == pid), None)
+        if product and product.get("category"):
+            applicable += [d for d in discounts if d.get("target_type") == "category" and d.get("target_id") == product["category"]]
+        applicable += [d for d in discounts if d.get("target_type") == "all"]
+
+        now_dt = datetime.now()
+        applicable = [
+            d for d in applicable
+            if (not d.get("valid_from") or datetime.fromisoformat(d["valid_from"]) <= now_dt) and
+               (not d.get("valid_to") or datetime.fromisoformat(d["valid_to"]) >= now_dt)
+        ]
+        if not applicable:
+            return 0.0
+        disc = applicable[0]
+        if disc.get("discount_type") == "percentage":
+            return price * qty * (float(disc.get("value", 0)) / 100)
+        return float(disc.get("value", 0)) * qty
+
+    subtotal = 0.0
+    discount_total = 0.0
+
+    for item in sale.get("items", []):
+        product = next((p for p in products if p["id"] == item["product_id"]), None)
+        if not product:
+            continue
+        quantity = int(item.get("quantity", 0))
+        # 取得商品售價
+        unit_price = float(item.get("unit_price", product.get("sale_price", 0)))
+
+        # 庫存檢查，避免負數
+        if product.get("stock", 0) < quantity:
+            raise HTTPException(status_code=400, detail=f"商品 {product.get('name')} 庫存不足")
+
+        subtotal += unit_price * quantity
+        discount_total += calc_discount(product["id"], quantity, unit_price)
+
+        product["stock"] -= quantity
+        product["updated_at"] = now.isoformat()
+
+    manual_type = sale.get("manual_discount_type")
+    manual_value = float(sale.get("manual_discount_value", 0) or 0)
+    manual_discount = 0.0
+    if manual_type == "percentage":
+        manual_discount = subtotal * (manual_value / 100)
+    elif manual_type == "amount":
+        manual_discount = manual_value
+    discount_total += manual_discount
+
+    total = subtotal - discount_total
+    amount_received = float(sale.get("amount_received", total))
+    if amount_received < total:
+        raise HTTPException(status_code=400, detail="實收金額不足")
+
+    sale_data = {
+        "id": sale_id,
+        "items": sale.get("items", []),
+        "member_id": sale.get("member_id"),
+        "subtotal": subtotal,
+        "discount": discount_total,
+        "total": total,
+        "payment_method": sale.get("payment_method", "cash"),
+        "amount_received": amount_received,
+        "change": amount_received - total,
+        "manual_discount_type": manual_type,
+        "manual_discount_value": manual_value,
+        "created_at": now.isoformat(),
+        "cashier": sale.get("cashier", "系統管理員")
+    }
+
+    sales.append(sale_data)
+    save_data("sales", sales)
+    save_data("products", products)
+
+    if sale_data.get("member_id"):
+        members = load_data("members")
+        member = next((m for m in members if m["id"] == sale_data["member_id"]), None)
+        if member:
+            member["total_spent"] = member.get("total_spent", 0) + total
+            member["points"] = member.get("points", 0) + int(total // 100)
+            member["updated_at"] = now.isoformat()
+            save_data("members", members)
+
+    return {"message": "銷售記錄已建立", "sale_id": sale_id}
+
+# 進貨相關 API
+@app.get("/api/purchases")
+async def get_purchases():
+    """獲取所有進貨記錄"""
+    try:
+        purchases = load_data("purchases")
+        return {"data": purchases}
+    except Exception as e:
+        logger.error(f"Error getting purchases: {e}")
+        raise HTTPException(status_code=500, detail="獲取進貨記錄時發生錯誤")
+
+@app.get("/api/purchases/{purchase_id}")
+async def get_purchase(purchase_id: str):
+    """根據ID獲取單筆進貨記錄"""
+    try:
+        purchases = load_data("purchases")
+        purchase = next((p for p in purchases if str(p.get("id")) == str(purchase_id)), None)
+        if not purchase:
+            raise HTTPException(status_code=404, detail="進貨記錄不存在")
+        
+        # 獲取供應商信息
+        suppliers = load_data("suppliers")
+        supplier = next((s for s in suppliers if str(s.get("id")) == str(purchase.get("supplier_id"))), {})
+        purchase["supplier_name"] = supplier.get("name", "未知供應商")
+        
+        # 獲取商品信息
+        products = load_data("products")
+        for item in purchase.get("items", []):
+            product = next((p for p in products if str(p.get("id")) == str(item.get("product_id"))), {})
+            item["product_name"] = product.get("name", "未知商品")
+        
+        return {"data": purchase}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting purchase {purchase_id}: {e}")
+        raise HTTPException(status_code=500, detail="獲取進貨記錄時發生錯誤")
+
+@app.post("/api/purchases")
+async def create_purchase(purchase: dict):
+    """創建新的進貨記錄"""
+    try:
+        error = validate_required_fields(purchase, ["supplier_id", "items"])
+        if error:
+            raise HTTPException(status_code=400, detail=error)
+        if not isinstance(purchase["items"], list):
+            raise HTTPException(status_code=400, detail="進貨項目格式錯誤")
+        
+        # 載入現有數據
+        purchases = load_data("purchases")
+        products = load_data("products")
+        
+        # 生成唯一ID
+        purchase_id = f"P{len(purchases) + 1:04d}"
+        now = datetime.now().isoformat()
+        
+        # 計算總金額
+        subtotal = 0
+        for item in purchase["items"]:
+            product = next((p for p in products if str(p.get("id")) == str(item.get("product_id"))), None)
+            if not product:
+                raise HTTPException(status_code=400, detail=f"找不到商品 ID: {item.get('product_id')}")
+            
+            quantity = int(item.get("quantity", 0))
+            unit_price = float(item.get("unit_price", 0))
+            item_total = quantity * unit_price
+            subtotal += item_total
+            
+            # 更新商品庫存（如果狀態為已接收）
+            if purchase.get("status") == "received":
+                product["stock"] = product.get("stock", 0) + quantity
+                product["updated_at"] = now
+        
+        # 計算稅金和總金額
+        tax_rate = float(purchase.get("tax_rate", 0)) / 100
+        tax = subtotal * tax_rate
+        shipping_cost = float(purchase.get("shipping_cost", 0))
+        total_amount = subtotal + tax + shipping_cost
+        
+        # 創建新的進貨記錄
+        new_purchase = {
+            "id": purchase_id,
+            "purchase_number": f"PO-{datetime.now().strftime('%Y%m%d')}-{len(purchases) + 1:04d}",
+            "supplier_id": purchase.get("supplier_id"),
+            "purchase_date": purchase.get("purchase_date", now),
+            "expected_delivery_date": purchase.get("expected_delivery_date"),
+            "status": purchase.get("status", "pending"),
+            "shipping_fee": shipping_cost,
+            "tax_rate": tax_rate * 100,
+            "notes": purchase.get("notes", ""),
+            "items": [{
+                "product_id": item.get("product_id"),
+                "quantity": int(item.get("quantity", 0)),
+                "unit_price": float(item.get("unit_price", 0)),
+                "product_name": next((p.get("name", "") for p in products if str(p.get("id")) == str(item.get("product_id"))), "未知商品")
+            } for item in purchase["items"]],
+            "subtotal": subtotal,
+            "tax": tax,
+            "total_amount": total_amount,
+            "payment_status": purchase.get("payment_status", "unpaid"),
+            "created_at": now,
+            "updated_at": now,
+            "created_by": "system"
+        }
+        
+        # 保存更新後的商品數據
+        save_data("products", products)
+        
+        # 添加新的進貨記錄並保存
+        purchases.append(new_purchase)
+        save_data("purchases", purchases)
+        
+        return {"message": "進貨記錄創建成功", "data": new_purchase}
+        
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"數據格式錯誤: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error creating purchase: {e}")
+        raise HTTPException(status_code=500, detail="創建進貨記錄時發生錯誤")
+
+@app.put("/api/purchases/{purchase_id}")
+async def update_purchase(purchase_id: str, purchase_data: dict):
+    """更新進貨記錄"""
+    purchases = load_data("purchases")
+    purchase_index = next((i for i, p in enumerate(purchases) if p["id"] == purchase_id), None)
+    
+    if purchase_index is None:
+        raise HTTPException(status_code=404, detail="進貨記錄不存在")
+    
+    old_purchase = purchases[purchase_index]
+    
+    # 更新進貨記錄
+    updated_purchase = {**old_purchase, **purchase_data}
+    updated_purchase["updated_at"] = datetime.now().isoformat()
+    
+    # 如果狀態從其他變更為已接收，則更新庫存
+    if old_purchase["status"] != "received" and updated_purchase["status"] == "received":
+        update_inventory_for_purchase(updated_purchase)
+    
+    purchases[purchase_index] = updated_purchase
+    save_data("purchases", purchases)
+    
+    return updated_purchase
+
+@app.delete("/api/purchases/{purchase_id}")
+async def delete_purchase(purchase_id: str):
+    """刪除進貨記錄"""
+    purchases = load_data("purchases")
+    purchase_index = next((i for i, p in enumerate(purchases) if p["id"] == purchase_id), None)
+    
+    if purchase_index is None:
+        raise HTTPException(status_code=404, detail="進貨記錄不存在")
+    
+    # 檢查是否可以刪除（例如：已完成的進貨可能不允許刪除）
+    purchase = purchases[purchase_index]
+    if purchase.get("status") == "received":
+        raise HTTPException(status_code=400, detail="已完成的進貨記錄無法刪除")
+    
+    # 從列表中移除
+    deleted_purchase = purchases.pop(purchase_index)
+    save_data("purchases", purchases)
+    
+    return {"message": "進貨記錄已刪除", "purchase": deleted_purchase}
+
+def update_inventory_for_purchase(purchase: Dict):
+    """更新庫存（當進貨單被標記為已接收時調用）"""
+    products = load_data("products")
+    updated = False
+    
+    for item in purchase.get("items", []):
+        product_id = item.get("product_id")
+        quantity = int(item.get("quantity", 0))
+        
+        # 找到對應的產品並更新庫存
+        for product in products:
+            if product["id"] == product_id:
+                product["stock"] = str(int(product.get("stock", 0)) + quantity)
+                product["updated_at"] = datetime.now().isoformat()
+                updated = True
+                break
+    
+    if updated:
+        save_data("products", products)
+
+# 會員相關 API
+@app.get("/api/members")
+async def get_members():
+    return load_data("members")
+
+@app.get("/api/members/{member_id}")
+async def get_member(member_id: str):
+    members = load_data("members")
+    member = next((m for m in members if m["id"] == member_id), None)
+    if not member:
+        raise HTTPException(status_code=404, detail="會員不存在")
+    return member
+
+@app.post("/api/members")
+async def create_member(member: dict):
+    members = load_data("members")
+    if not isinstance(members, list):
+        members = []
+
+    error = validate_required_fields(member, ["name", "phone"])
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+        
+    # 檢查電話是否已存在
+    if any(m.get('phone') == member.get('phone') for m in members):
+        raise HTTPException(status_code=400, detail="此電話號碼已被使用")
+    
+    # 生成會員編號
+    member_id = f"M{len(members) + 1:04d}"
+    
+    member_data = {
+        "id": member_id,
+        "name": member.get("name", ""),
+        "phone": member.get("phone", ""),
+        "email": member.get("email", ""),
+        "birthday": member.get("birthday"),
+        "member_level": member.get("member_level", "standard"),
+        "status": member.get("status", "active"),
+        "address": member.get("address", ""),
+        "notes": member.get("notes", ""),
+        "total_spent": 0,
+        "points": 0,
+        "created_at": datetime.now().isoformat(),
+        "updated_at": datetime.now().isoformat()
+    }
+    
+    members.append(member_data)
+    save_data("members", members)
+    return {"message": "會員新增成功", "id": member_id}
+
+@app.put("/api/members/{member_id}")
+async def update_member(member_id: str, member_data: dict):
+    members = load_data("members")
+    if not isinstance(members, list):
+        members = []
+    
+    member_index = next((i for i, m in enumerate(members) if m["id"] == member_id), None)
+    if member_index is None:
+        raise HTTPException(status_code=404, detail="會員不存在")
+    
+    # 檢查電話是否已被其他會員使用
+    if any(m.get('phone') == member_data.get('phone') and m['id'] != member_id for m in members):
+        raise HTTPException(status_code=400, detail="此電話號碼已被其他會員使用")
+    
+    # 保留原始數據
+    original_member = members[member_index]
+    
+    # 更新會員資料
+    updated_member = {
+        **original_member,
+        "name": member_data.get("name", original_member.get("name", "")),
+        "phone": member_data.get("phone", original_member.get("phone", "")),
+        "email": member_data.get("email", original_member.get("email", "")),
+        "birthday": member_data.get("birthday", original_member.get("birthday")),
+        "member_level": member_data.get("member_level", original_member.get("member_level", "standard")),
+        "status": member_data.get("status", original_member.get("status", "active")),
+        "address": member_data.get("address", original_member.get("address", "")),
+        "notes": member_data.get("notes", original_member.get("notes", "")),
+        "updated_at": datetime.now().isoformat()
+    }
+    
+    members[member_index] = updated_member
+    save_data("members", members)
+    return {"message": "會員資料已更新", "id": member_id}
+
+@app.delete("/api/members/{member_id}")
+async def delete_member(member_id: str):
+    members = load_data("members")
+    if not isinstance(members, list):
+        members = []
+    
+    member_index = next((i for i, m in enumerate(members) if m["id"] == member_id), None)
+    if member_index is None:
+        raise HTTPException(status_code=404, detail="會員不存在")
+    
+    # 檢查是否有關聯的銷售記錄
+    sales = load_data("sales") or []
+    if any(sale.get("member_id") == member_id for sale in sales):
+        raise HTTPException(status_code=400, detail="無法刪除，該會員已有消費記錄")
+    
+    # 刪除會員
+    del members[member_index]
+    save_data("members", members)
+    
+    return {"message": "會員已刪除", "id": member_id}
+
+# 供應商相關 API
+@app.get("/api/suppliers")
+async def get_suppliers():
+    return load_data("suppliers")
+
+@app.get("/api/suppliers/{supplier_id}")
+async def get_supplier(supplier_id: str):
+    suppliers = load_data("suppliers")
+    supplier = next((s for s in suppliers if s["id"] == supplier_id), None)
+    if not supplier:
+        raise HTTPException(status_code=404, detail="供應商不存在")
+    return supplier
+
+@app.post("/api/suppliers")
+async def create_supplier(supplier: dict):
+    suppliers = load_data("suppliers")
+    error = validate_required_fields(supplier, ["name"])
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    supplier["id"] = f"S{len(suppliers) + 1:03d}"
+    supplier["created_at"] = datetime.now().isoformat()
+    suppliers.append(supplier)
+    save_data("suppliers", suppliers)
+    return {"message": "供應商新增成功", "id": supplier["id"]}
+
+@app.put("/api/suppliers/{supplier_id}")
+async def update_supplier(supplier_id: str, supplier_data: dict):
+    suppliers = load_data("suppliers")
+    index = next((i for i, s in enumerate(suppliers) if s["id"] == supplier_id), None)
+    if index is None:
+        raise HTTPException(status_code=404, detail="供應商不存在")
+    
+    # 保留創建時間，更新其他欄位
+    supplier_data["id"] = supplier_id
+    supplier_data["created_at"] = suppliers[index].get("created_at", datetime.now().isoformat())
+    supplier_data["updated_at"] = datetime.now().isoformat()
+    
+    suppliers[index] = supplier_data
+    save_data("suppliers", suppliers)
+    
+    return {"message": "供應商更新成功", "id": supplier_id}
+
+@app.delete("/api/suppliers/{supplier_id}")
+async def delete_supplier(supplier_id: str):
+    suppliers = load_data("suppliers")
+    supplier_ids = [s["id"] for s in suppliers]
+    
+    if supplier_id not in supplier_ids:
+        raise HTTPException(status_code=404, detail="供應商不存在")
+    
+    # 檢查是否有相關的進貨或付款記錄
+    purchases = load_data("purchases")
+    payments = load_data("payments")
+
+    has_related_purchases = any(p["supplier_id"] == supplier_id for p in purchases)
+    has_related_payments = any(pay.get("supplier_id") == supplier_id for pay in payments)
+
+    if has_related_purchases or has_related_payments:
+        raise HTTPException(
+            status_code=400,
+            detail="無法刪除該供應商，因為有相關的進貨或付款記錄"
+        )
+    
+    # 刪除供應商
+    updated_suppliers = [s for s in suppliers if s["id"] != supplier_id]
+    save_data("suppliers", updated_suppliers)
+
+    return {"message": "供應商已刪除", "id": supplier_id}
+
+# 付款記錄相關 API
+@app.get("/api/payments")
+async def get_payments():
+    return load_data("payments")
+
+
+@app.get("/api/payments/{payment_id}")
+async def get_payment(payment_id: str):
+    payments = load_data("payments")
+    payment = next((p for p in payments if p["id"] == payment_id), None)
+    if not payment:
+        raise HTTPException(status_code=404, detail="付款紀錄不存在")
+    return payment
+
+
+@app.post("/api/payments")
+async def create_payment(payment: dict):
+    payments = load_data("payments")
+    purchases = load_data("purchases")
+
+    error = validate_required_fields(payment, ["supplier_id", "amount"])
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    if float(payment.get("amount", 0)) <= 0:
+        raise HTTPException(status_code=400, detail="付款金額必須大於0")
+
+    payment_id = f"PM{len(payments) + 1:04d}"
+    now = datetime.now().isoformat()
+
+    payment_data = {
+        "id": payment_id,
+        "supplier_id": payment.get("supplier_id"),
+        "amount": float(payment.get("amount", 0)),
+        "payment_date": payment.get("payment_date", now),
+        "notes": payment.get("notes", ""),
+        "purchase_ids": payment.get("purchase_ids", []),
+        "created_at": now,
+    }
+
+    payments.append(payment_data)
+
+    for pid in payment_data["purchase_ids"]:
+        purchase = next((p for p in purchases if p.get("id") == pid), None)
+        if purchase:
+            purchase["payment_status"] = "paid"
+            purchase["paid"] = True
+            purchase["paid_date"] = now
+
+    save_data("payments", payments)
+    save_data("purchases", purchases)
+
+    return {"message": "付款記錄已建立", "id": payment_id}
+
+# 折扣相關 API
+@app.get("/api/discounts")
+async def get_discounts():
+    return load_data("discounts")
+
+
+@app.get("/api/discounts/{discount_id}")
+async def get_discount(discount_id: str):
+    discounts = load_data("discounts")
+    discount = next((d for d in discounts if d["id"] == discount_id), None)
+    if not discount:
+        raise HTTPException(status_code=404, detail="折扣不存在")
+    return discount
+
+
+@app.post("/api/discounts")
+async def create_discount(discount: dict):
+    discounts = load_data("discounts")
+    discount_id = f"D{len(discounts) + 1:04d}"
+    now = datetime.now().isoformat()
+
+    if not discount.get("name"):
+        raise HTTPException(status_code=400, detail="折扣名稱不能為空")
+    if discount.get("value") is None:
+        raise HTTPException(status_code=400, detail="折扣值必須提供")
+
+    discount_data = {
+        "id": discount_id,
+        "name": discount.get("name", ""),
+        "discount_type": discount.get("discount_type", "percentage"),
+        "value": float(discount.get("value", 0)),
+        "target_type": discount.get("target_type", "product"),
+        "target_id": discount.get("target_id"),
+        "valid_from": discount.get("valid_from"),
+        "valid_to": discount.get("valid_to"),
+        "created_at": now,
+        "updated_at": now,
+    }
+
+    discounts.append(discount_data)
+    save_data("discounts", discounts)
+    return {"message": "折扣已建立", "id": discount_id}
+
+
+@app.put("/api/discounts/{discount_id}")
+async def update_discount(discount_id: str, discount: dict):
+    discounts = load_data("discounts")
+    index = next((i for i, d in enumerate(discounts) if d["id"] == discount_id), None)
+    if index is None:
+        raise HTTPException(status_code=404, detail="折扣不存在")
+
+    discount["id"] = discount_id
+    discount["created_at"] = discounts[index].get("created_at")
+    discount["updated_at"] = datetime.now().isoformat()
+    discounts[index] = discount
+    save_data("discounts", discounts)
+    return {"message": "折扣已更新", "id": discount_id}
+
+
+@app.delete("/api/discounts/{discount_id}")
+async def delete_discount(discount_id: str):
+    discounts = load_data("discounts")
+    index = next((i for i, d in enumerate(discounts) if d["id"] == discount_id), None)
+    if index is None:
+        raise HTTPException(status_code=404, detail="折扣不存在")
+    discounts.pop(index)
+    save_data("discounts", discounts)
+    return {"message": "折扣已刪除", "id": discount_id}
+
+# 報表相關 API
+@app.get("/api/reports/overview")
+async def get_report_overview(start_date: str = None, end_date: str = None):
+    """返回簡易銷售報表數據"""
+    service = ReportService(str(DATA_DIR))
+    report = service.get_sales_report(start_date, end_date)
+    return report
+
+
+# 啟動服務
+if __name__ == "__main__":
+    try:
+        logger.info("Starting server...")
+        uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, log_level="info")
+    except Exception as e:
+        logger.error(f"Failed to start server: {e}")
+        raise
+
+===== models.py =====
+from datetime import datetime, date
+from typing import List, Dict, Optional, Literal
+from dataclasses import dataclass, field, asdict
+from uuid import uuid4
+
+# 供應商資料模型
+@dataclass
+class Supplier:
+    name: str  # 供應商名稱
+    contact: str = ""  # 聯絡方式
+    payment_cycle: str = "monthly"  # 結帳週期: monthly(月結), quarterly(季結)
+    note: str = ""  # 備註
+    id: str = field(default_factory=lambda: str(uuid4()))
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
+
+# 商品資料模型
+@dataclass
+class Product:
+    name: str  # 商品名稱
+    category: str = ""  # 商品分類
+    cost_price: float = 0.0  # 成本價
+    selling_price: float = 0.0  # 建議售價
+    stock: int = 0  # 庫存數量
+    id: str = field(default_factory=lambda: str(uuid4()))
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
+
+# 進貨記錄模型
+@dataclass
+class Purchase:
+    supplier_id: str  # 供應商ID
+    id: str = field(default_factory=lambda: str(uuid4()))
+    purchase_date: str = field(default_factory=lambda: date.today().isoformat())
+    total_amount: float = 0.0  # 總金額
+    paid: bool = False  # 是否已付款
+    paid_date: Optional[str] = None  # 付款日期
+    note: str = ""  # 備註
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    
+    # 明細項目 (不會直接儲存，而是通過PurchaseItem關聯)
+    items: List[Dict] = field(default_factory=list)
+
+# 進貨明細項目
+@dataclass
+class PurchaseItem:
+    purchase_id: str  # 進貨單ID
+    product_id: str  # 商品ID
+    quantity: int  # 數量
+    unit_price: float  # 單價
+    total_price: float  # 總價 (quantity * unit_price)
+
+# 會員資料模型
+@dataclass
+class Member:
+    name: str  # 會員姓名
+    phone: str = ""  # 電話
+    email: str = ""  # 電子郵件
+    note: str = ""  # 備註
+    id: str = field(default_factory=lambda: str(uuid4()))
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    
+# 付款紀錄模型
+@dataclass
+class Payment:
+    supplier_id: str  # 供應商ID
+    amount: float     # 付款金額
+    payment_date: str # 付款日期
+    id: str = field(default_factory=lambda: str(uuid4()))
+    note: str = ""    # 備註
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    # 關聯的進貨單ID列表 (非必要，但有助於追蹤)
+    purchase_ids: List[str] = field(default_factory=list)   
+
+
+# 銷售記錄模型
+@dataclass
+class Sale:
+    id: str = field(default_factory=lambda: str(uuid4()))
+    member_id: Optional[str] = None  # 會員ID (可選)
+    sale_date: str = field(default_factory=lambda: datetime.now().isoformat())
+    total_amount: float = 0.0  # 總金額
+    discount_amount: float = 0.0  # 折扣金額
+    final_amount: float = 0.0  # 實際收款金額 (total_amount - discount_amount)
+    payment_method: str = "cash"  # 付款方式: cash, credit_card, etc.
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    
+    # 明細項目 (不會直接儲存，而是通過SaleItem關聯)
+    items: List[Dict] = field(default_factory=list)
+
+# 銷售明細項目
+@dataclass
+class SaleItem:
+    sale_id: str  # 銷售單ID
+    product_id: str  # 商品ID
+    quantity: int  # 數量
+    unit_price: float  # 單價
+    total_price: float  # 總價 (quantity * unit_price - discount)
+    discount: float = 0.0  # 折扣金額
+
+# 折扣活動模型
+@dataclass
+class Discount:
+    # --- 沒有預設值的欄位放前面 ---
+    name: str  # 活動名稱
+    value: float  # 折扣值 (百分比: 0-100, 固定金額: 折扣金額)
+    valid_from: str  # 活動開始日期
+    valid_to: str  # 活動結束日期
+
+    # --- 有預設值的欄位放後面 ---
+    id: str = field(default_factory=lambda: str(uuid4()))
+    discount_type: Literal["percentage", "fixed"] = "percentage"  # 折扣類型: 百分比/固定金額
+    target_type: Literal["product", "category", "all"] = "product"  # 適用對象
+    target_id: Optional[str] = None  # 對象ID (商品ID或分類名稱)
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
+
+# 資料庫集合名稱
+COLLECTIONS = {
+    'suppliers': 'suppliers',
+    'products': 'products',
+    'purchases': 'purchases',
+    'purchase_items': 'purchase_items',
+    'payments': 'payments', 
+    'members': 'members',
+    'sales': 'sales',
+    'sale_items': 'sale_items',
+    'discounts': 'discounts'
+}
+
+
+===== PROGRESS_LOG.md =====
+# Development Log
+
+This log captures progress on resolving data issues and implementing features.
+
+## 2025-07-30
+- Normalized `members.json` and `sales.json` to use array structures only.
+- Enhanced `load_data` in `main.py` to support legacy wrapped formats.
+- Created `TODO.md` with pending tasks for future improvements.
+
+## 2025-07-31
+- Added `validate_required_fields` helper and integrated basic validation into API endpoints.
+- Refactored `BaseService` to transparently handle list-based JSON files.
+- Created `init_data.py` script for initializing empty data files.
+- Added unit tests for validation and service helpers.
+
+## 2025-08-01
+- Added optional stubs for FastAPI and uvicorn so tests run without network dependencies.
+- Cleaned up stray `__pycache__` directories from the repository.
+
+
+
+
+===== requirements.txt =====
+fastapi==0.104.1
+uvicorn==0.24.0
+python-multipart==0.0.6
+python-dateutil==2.8.2
+pydantic==2.4.2
+pytest==8.4.1
+
+
+===== TODO.md =====
+# TODO List
+
+This document tracks outstanding tasks for the project and records progress on resolving them.
+
+## Pending tasks
+
+
+- [ ] Create unit tests.
+
+
+## Completed tasks
+
+- [x] Unified `members.json` and `sales.json` to simple array structures.
+- [x] Updated `load_data` helper to handle legacy wrapped formats gracefully.
+- [x] Implement payment record API endpoints and link purchases with payments.
+- [x] Provide CRUD for discount objects and integrate with sale calculations.
+- [x] Update member statistics when sales are created.
+- [x] Improve delete operations to check for related records (e.g. suppliers with payments).
+- [x] Added optional FastAPI/uvicorn stubs for offline testing.
+- [x] Add data validation helpers and better error handling.
+- [x] Write initialization script.
+- [x] Review `BaseService` data model mismatch (dictionary vs list) and refactor if needed.
+- [x] `templates/sales.html`: Added missing elements required by `sales.js`.
+- [x] `static/js/purchases.js`: Implemented create and delete functionality.
+- [x] `static/js/reports.js`: Fetched sales and category data from API and redrew charts.
+- [x] `static/js/members.js`: Confirmed member create/edit/delete actions are API-connected.
+- [x] `static/js/suppliers.js`: Confirmed supplier management actions are API-connected.
+- [x] `static/js/products.js`: Implemented product image upload and barcode scanning.
+
+===== utils.py =====
+from typing import Dict, List, Optional
+
+
+def validate_required_fields(data: Dict, required: List[str]) -> Optional[str]:
+    """Return error message if any required field is missing or empty."""
+    missing = [field for field in required if not data.get(field)]
+    if missing:
+        return "缺少必要欄位: " + ", ".join(missing)
+    return None
+
+
+===== 書房記帳與營運管理系統 規格書.md =====
+# 書房記帳與營運管理系統 規格書
+
+一、系統目標與核心概念
+
+此系統旨在協助福音書房進行進銷存記錄、供應商結帳管理、會員銷售記錄與折扣追蹤，提升營運透明度與資料保存完整性。目標為提供一套簡便、安全、可手機操作的離線管理工具，兼顧日常記帳與對帳需求。
+
+二、系統模組架構
+
+1. 商品與進貨管理
+
+商品建立與分類
+
+進貨登錄：含供應商、數量、單價、總金額、自動計算成本
+
+可標註是否已付款、付款日、備註
+
+2. 供應商與結帳管理
+
+供應商基本資訊設定（結帳週期、自訂聯絡資料）
+
+每月／每季結帳週期設定
+
+支援多筆進貨批次結帳與部分付款
+
+應付款統計與付款記錄管理
+
+3. 銷售與折扣管理
+
+商品銷售輸入：選擇商品、數量、實際售價或折扣金額／百分比
+
+可關聯會員資訊
+
+自動計算總金額、找零
+
+銷售明細（含商品、售價、折扣、數量）獨立記錄
+
+折扣可手動或從預設活動套用
+
+4. 會員管理
+
+建立基本資料（姓名、電話、備註）
+
+關聯銷售記錄
+
+查詢會員購買歷史、累計金額與最後交易日
+
+5. 查詢與報表
+
+進貨查詢（可依供應商、日期、付款狀態）
+
+銷售查詢（每日／期間總額、折扣統計）
+
+會員查詢（依會員查銷售紀錄）
+
+供應商結帳報表（應付／已付總額、自動結帳建議）
+
+三、資料庫結構建議（表格設計）
+
+1. suppliers（供應商）
+
+欄位名稱類型說明idint主鍵nametext供應商名稱contacttext聯絡方式payment_cycletext結帳週期（例如：月結、季結）notetext備註2. products（商品）
+
+| id | int | 主鍵 |
+
+| name | text | 商品名稱 |
+
+| category | text | 商品分類 |
+
+| cost_price | float | 成本價 |
+
+| selling_price | float | 建議售價 |
+
+3. purchases（進貨紀錄）
+
+| id | int | 主鍵 |
+
+| supplier_id | int | 外鍵：供應商 |
+
+| product_id | int | 外鍵：商品 |
+
+| quantity | int | 數量 |
+
+| unit_price | float | 單價 |
+
+| total_price | float | 自動計算總價 |
+
+| purchase_date | date | 進貨日期 |
+
+| paid | boolean | 是否已付款 |
+
+| paid_date | date | 付款日期（若已付款） |
+
+| note | text | 備註 |
+
+4. payments（付款紀錄）
+
+| id | int | 主鍵 |
+
+| supplier_id | int | 外鍵：供應商 |
+
+| amount | float | 付款金額 |
+
+| payment_date | date | 付款日期 |
+
+| note | text | 備註 |
+
+5. members（會員）
+
+| id | int | 主鍵 |
+
+| name | text | 會員姓名 |
+
+| phone | text | 聯絡電話 |
+
+| note | text | 備註 |
+
+6. sales（銷售主檔）
+
+| id | int | 主鍵 |
+
+| member_id | int/null | 外鍵：會員（可空） |
+
+| sale_date | date | 銷售日期 |
+
+| total_amount | float | 銷售總額 |
+
+| cash_received | float | 實收金額 |
+
+| change_given | float | 找零金額 |
+
+| note | text | 備註 |
+
+| items | array | 銷售明細 JSON 陣列（可嵌套每筆商品資訊） |
+
+7. sales_items（銷售明細）
+
+若採用嵌套於 sales 內部，可略過此表
+
+| id | int | 主鍵 |
+
+| sale_id | int | 外鍵：銷售單號 |
+
+| product_id | int | 外鍵：商品 |
+
+| quantity | int | 數量 |
+
+| price | float | 單價（含折扣後） |
+
+| discount | float | 折扣（若有） |
+
+8. discounts（可選，預設折扣）
+
+| id | int | 主鍵 |
+
+| product_id | int | 外鍵：商品 |
+
+| discount_type | text | percent / fixed |
+
+| value | float | 折扣數值（10% 或固定金額） |
+
+| valid_from | date | 活動起始日 |
+
+| valid_to | date | 活動結束日 |
+
+四、系統技術建議（以 Firebase 為基礎）
+
+使用 Firebase Firestore 作為主資料庫（JSON 結構文件）
+
+Firebase Authentication 處理登入驗證（Email/密碼 或 Google 登入）
+
+Firebase Hosting 部署 Web 操作介面
+
+支援手機與桌機介面
+
+若有進階需求，可加入 Cloud Functions 處理定時結帳提醒、自動統計與備份
+
+五、Firestore 建議資料結構
+
+/suppliers/{supplierId}
+
+/products/{productId}
+
+/purchases/{purchaseId}
+
+/payments/{paymentId}
+
+/members/{memberId}
+
+/sales/{saleId}
+
+/sales/{saleId}/items/{itemId}（若使用子集合）
+
+/discounts/{discountId}
+
+每個 Document 皆為 JSON 格式，並依照各模組資料設計填入對應欄位。
+
+六、擴充方向建議
+
+商品庫存數量管理（每次進貨＋銷售自動調整）
+
+月結自動提醒與供應商結清建議金額
+
+圖表儀表板（總體營收、付款進度、會員排行榜）
+
+客製化 Excel 匯出格式（報帳與結帳用）
+
+
+===== .vscode\settings.json =====
+{
+    "liveServer.settings.port": 5501
+}
+
+===== data\discounts.json =====
+[
+  {
+    "id": "D001",
+    "name": "全館 10% off",
+    "target_type": "all",
+    "target_id": null,
+    "discount_type": "percentage",
+    "value": 10,
+    "valid_from": "2025-08-01T00:00:00",
+    "valid_to": "2025-08-31T23:59:59"
+  }
+]
+
+
+===== data\members.json =====
+[
+  {
+    "id": "M001",
+    "name": "王小明",
+    "phone": "0912345678",
+    "email": "ming@example.com",
+    "address": "台北市大安區復興南路一段100號",
+    "birthday": "1990-05-15",
+    "join_date": "2025-01-10T10:00:00Z",
+    "total_purchases": 5,
+    "total_spent": 4620.0,
+    "last_visit": "2025-07-20T10:15:00Z",
+    "notes": "常購買靈修類書籍",
+    "created_at": "2025-01-10T10:00:00Z",
+    "updated_at": "2025-08-06T15:09:58.942926",
+    "points": 11
+  },
+  {
+    "id": "M002",
+    "name": "林小華",
+    "phone": "0922333444",
+    "email": "hua@example.com",
+    "address": "新北市板橋區文化路一段200號",
+    "birthday": "1985-10-20",
+    "join_date": "2025-02-15T14:30:00Z",
+    "total_purchases": 3,
+    "total_spent": 2800,
+    "last_visit": "2025-07-18T16:45:00Z",
+    "notes": "偏好神學類書籍",
+    "created_at": "2025-02-15T14:30:00Z",
+    "updated_at": "2025-07-31T13:32:37.356793",
+    "member_level": "standard",
+    "status": "active"
+  },
+  {
+    "id": "M003",
+    "name": "陳小美",
+    "phone": "0933555777",
+    "email": "mei@example.com",
+    "address": "台北市信義區信義路五段50號",
+    "birthday": "1995-03-25",
+    "join_date": "2025-03-05T11:20:00Z",
+    "total_purchases": 2,
+    "total_spent": 1500,
+    "last_visit": "2025-07-10T13:15:00Z",
+    "notes": "新會員，購買兒童聖經",
+    "created_at": "2025-03-05T11:20:00Z",
+    "updated_at": "2025-07-10T13:15:00Z"
+  },
+  {
+    "id": "M0002",
+    "name": "JJ",
+    "phone": "0909090990",
+    "email": "123@GG",
+    "birthday": "2025-07-24",
+    "member_level": "platinum",
+    "status": "active",
+    "address": "123",
+    "notes": "456",
+    "total_spent": 1605.0,
+    "points": 15,
+    "created_at": "2025-07-24T17:48:11.616828",
+    "updated_at": "2025-08-06T16:10:12.664988"
+  }
+]
+
+===== data\payments.json =====
+[]
+
+===== data\products.json =====
+[
+  {
+    "id": "P001",
+    "name": "原子習慣",
+    "category": "書籍",
+    "purchase_price": 280,
+    "sale_price": 500,
+    "stock": 50,
+    "supplier_id": "S001",
+    "min_stock": 5,
+    "unit": "本",
+    "created_at": "2025-07-01T10:00:00+08:00",
+    "updated_at": "2025-08-06T14:22:49.245120",
+    "description": ""
+  },
+  {
+    "id": "P002",
+    "name": "被討厭的勇氣",
+    "category": "心理勵志",
+    "purchase_price": 220,
+    "sale_price": 280,
+    "stock": 20,
+    "supplier_id": "S001",
+    "min_stock": 5,
+    "unit": "本",
+    "created_at": "2025-07-01T10:00:00+08:00",
+    "updated_at": "2025-08-06T15:09:58.942926"
+  },
+  {
+    "id": "P101",
+    "name": "筆記本",
+    "category": "文具",
+    "purchase_price": 15,
+    "sale_price": 25,
+    "stock": 93,
+    "supplier_id": "S002",
+    "min_stock": 20,
+    "unit": "本",
+    "created_at": "2025-07-15T09:30:00+08:00",
+    "updated_at": "2025-08-06T17:08:20.270438"
+  },
+  {
+    "id": "P102",
+    "name": "原子筆",
+    "category": "文具",
+    "purchase_price": 8,
+    "sale_price": 15,
+    "stock": 193,
+    "supplier_id": "S002",
+    "min_stock": 50,
+    "unit": "支",
+    "created_at": "2025-07-15T09:30:00+08:00",
+    "updated_at": "2025-08-06T17:08:20.270438"
+  },
+  {
+    "id": "P201",
+    "name": "高級鋼筆",
+    "category": "文具",
+    "purchase_price": 900,
+    "sale_price": 1200,
+    "stock": 15,
+    "supplier_id": "S003",
+    "min_stock": 5,
+    "unit": "支",
+    "created_at": "2025-07-20T11:00:00+08:00",
+    "updated_at": "2025-07-23T09:15:00+08:00"
+  },
+  {
+    "id": "P301",
+    "name": "高級書架",
+    "category": "傢俱",
+    "purchase_price": 2000,
+    "sale_price": 2500,
+    "stock": 5,
+    "supplier_id": "S004",
+    "min_stock": 2,
+    "unit": "組",
+    "created_at": "2025-07-18T14:00:00+08:00",
+    "updated_at": "2025-07-22T16:45:00+08:00"
+  },
+  {
+    "id": "P401",
+    "name": "暢銷小說",
+    "category": "小說",
+    "purchase_price": 140,
+    "sale_price": 180,
+    "stock": 44,
+    "supplier_id": "S005",
+    "min_stock": 10,
+    "unit": "本",
+    "created_at": "2025-07-15T10:00:00+08:00",
+    "updated_at": "2025-08-06T16:10:12.664988"
+  },
+  {
+    "id": "P402",
+    "name": "商業理財書",
+    "category": "商業",
+    "purchase_price": 180,
+    "sale_price": 220,
+    "stock": 26,
+    "supplier_id": "S005",
+    "min_stock": 10,
+    "unit": "本",
+    "created_at": "2025-07-15T10:00:00+08:00",
+    "updated_at": "2025-08-06T17:07:26.488118"
+  },
+  {
+    "id": "P403",
+    "name": "兒童繪本",
+    "category": "兒童",
+    "purchase_price": 120,
+    "sale_price": 150,
+    "stock": 40,
+    "supplier_id": "S005",
+    "min_stock": 10,
+    "unit": "本",
+    "created_at": "2025-07-15T10:00:00+08:00",
+    "updated_at": "2025-07-22T10:30:00+08:00"
+  }
+]
+
+===== data\purchases.json =====
+[
+  {
+    "id": "1",
+    "purchase_number": "PO-20250724-0001",
+    "supplier_id": "S001",
+    "purchase_date": "2025-07-24T10:00:00+08:00",
+    "expected_delivery_date": "2025-07-31T23:59:59+08:00",
+    "status": "received",
+    "shipping_fee": 150,
+    "tax_rate": 5,
+    "notes": "一般圖書進貨",
+    "items": [
+      {
+        "product_id": "P001",
+        "quantity": 20,
+        "unit_price": 350,
+        "product_name": "原子習慣"
+      },
+      {
+        "product_id": "P002",
+        "quantity": 15,
+        "unit_price": 280,
+        "product_name": "被討厭的勇氣"
+      }
+    ],
+    "total": 11250,
+    "created_at": "2025-07-24T10:00:00+08:00",
+    "updated_at": "2025-07-24T10:00:00+08:00"
+  },
+  {
+    "id": "2",
+    "purchase_number": "PO-20250724-0002",
+    "supplier_id": "S002",
+    "purchase_date": "2025-07-24T14:30:00+08:00",
+    "expected_delivery_date": "2025-07-28T23:59:59+08:00",
+    "status": "ordered",
+    "shipping_fee": 100,
+    "tax_rate": 5,
+    "notes": "文具用品進貨",
+    "items": [
+      {
+        "product_id": "P101",
+        "quantity": 50,
+        "unit_price": 25,
+        "product_name": "筆記本"
+      },
+      {
+        "product_id": "P102",
+        "quantity": 100,
+        "unit_price": 15,
+        "product_name": "原子筆"
+      }
+    ],
+    "total": 2875,
+    "created_at": "2025-07-24T14:30:00+08:00",
+    "updated_at": "2025-07-24T14:30:00+08:00"
+  },
+  {
+    "id": "3",
+    "purchase_number": "PO-20250723-0001",
+    "supplier_id": "S003",
+    "purchase_date": "2025-07-23T09:15:00+08:00",
+    "expected_delivery_date": "2025-07-30T23:59:59+08:00",
+    "status": "draft",
+    "shipping_fee": 0,
+    "tax_rate": 0,
+    "notes": "草稿訂單",
+    "items": [
+      {
+        "product_id": "P201",
+        "quantity": 10,
+        "unit_price": 1200,
+        "product_name": "高級鋼筆"
+      }
+    ],
+    "total": 12000,
+    "created_at": "2025-07-23T09:15:00+08:00",
+    "updated_at": "2025-07-23T09:15:00+08:00"
+  },
+  {
+    "id": "4",
+    "purchase_number": "PO-20250722-0001",
+    "supplier_id": "S004",
+    "purchase_date": "2025-07-22T11:20:00+08:00",
+    "expected_delivery_date": "2025-07-29T23:59:59+08:00",
+    "status": "cancelled",
+    "shipping_fee": 200,
+    "tax_rate": 5,
+    "notes": "供應商缺貨取消",
+    "items": [
+      {
+        "product_id": "P301",
+        "quantity": 5,
+        "unit_price": 2500,
+        "product_name": "高級書架"
+      }
+    ],
+    "total": 12750,
+    "created_at": "2025-07-22T11:20:00+08:00",
+    "updated_at": "2025-07-22T16:45:00+08:00"
+  },
+  {
+    "id": "5",
+    "purchase_number": "PO-20250721-0001",
+    "supplier_id": "S005",
+    "purchase_date": "2025-07-21T15:10:00+08:00",
+    "expected_delivery_date": "2025-07-25T23:59:59+08:00",
+    "status": "received",
+    "shipping_fee": 180,
+    "tax_rate": 5,
+    "notes": "促銷活動用書",
+    "items": [
+      {
+        "product_id": "P401",
+        "quantity": 30,
+        "unit_price": 180,
+        "product_name": "暢銷小說"
+      },
+      {
+        "product_id": "P402",
+        "quantity": 20,
+        "unit_price": 220,
+        "product_name": "商業理財書"
+      },
+      {
+        "product_id": "P403",
+        "quantity": 15,
+        "unit_price": 150,
+        "product_name": "兒童繪本"
+      }
+    ],
+    "total": 11550,
+    "created_at": "2025-07-21T15:10:00+08:00",
+    "updated_at": "2025-07-22T10:30:00+08:00"
+  },
+  {
+    "id": "P0006",
+    "purchase_number": "PO-20250724-0006",
+    "supplier_id": "S001",
+    "purchase_date": "2025-07-24",
+    "expected_delivery_date": "",
+    "status": "ordered",
+    "shipping_fee": 5000.0,
+    "tax_rate": 0.0,
+    "notes": "",
+    "items": [
+      {
+        "product_id": "P401",
+        "quantity": 1,
+        "unit_price": 140.0,
+        "product_name": "暢銷小說"
+      },
+      {
+        "product_id": "P301",
+        "quantity": 1,
+        "unit_price": 2000.0,
+        "product_name": "高級書架"
+      }
+    ],
+    "subtotal": 2140.0,
+    "tax": 0.0,
+    "total_amount": 7140.0,
+    "payment_status": "paid",
+    "created_at": "2025-07-24T17:54:01.365745",
+    "updated_at": "2025-07-24T17:54:01.365745",
+    "created_by": "system"
+  },
+  {
+    "id": "P0007",
+    "purchase_number": "PO-20250724-0007",
+    "supplier_id": "S004",
+    "purchase_date": "2025-07-24",
+    "expected_delivery_date": "2025-07-24",
+    "status": "ordered",
+    "shipping_fee": 0.0,
+    "tax_rate": 0.0,
+    "notes": "",
+    "items": [
+      {
+        "product_id": "P301",
+        "quantity": 2,
+        "unit_price": 2000.0,
+        "product_name": "高級書架"
+      }
+    ],
+    "subtotal": 4000.0,
+    "tax": 0.0,
+    "total_amount": 4000.0,
+    "payment_status": "unpaid",
+    "created_at": "2025-07-24T17:54:39.494246",
+    "updated_at": "2025-07-24T17:54:39.494246",
+    "created_by": "system"
+  }
+]
+
+===== data\sales.json =====
+[
+  {
+    "id": "S001",
+    "customer_id": "M001",
+    "sale_date": "2025-07-20T10:15:00Z",
+    "subtotal": 550,
+    "discount": 50,
+    "total_amount": 500,
+    "payment_method": "現金",
+    "items": [
+      {
+        "product_id": "P001",
+        "quantity": 1,
+        "unit_price": 300,
+        "discount": 0,
+        "subtotal": 300
+      },
+      {
+        "product_id": "P002",
+        "quantity": 1,
+        "unit_price": 250,
+        "discount": 50,
+        "subtotal": 200
+      }
+    ],
+    "notes": "會員消費",
+    "created_at": "2025-07-20T10:15:00Z"
+  },
+  {
+    "id": "S002",
+    "customer_id": null,
+    "sale_date": "2025-07-21T15:30:00Z",
+    "subtotal": 900,
+    "discount": 0,
+    "total_amount": 900,
+    "payment_method": "信用卡",
+    "items": [
+      {
+        "product_id": "P003",
+        "quantity": 2,
+        "unit_price": 450,
+        "discount": 0,
+        "subtotal": 900
+      }
+    ],
+    "notes": "非會員消費",
+    "created_at": "2025-07-21T15:30:00Z"
+  },
+  {
+    "id": "S20250806142429",
+    "items": [
+      {
+        "product_id": "P102",
+        "quantity": 1,
+        "unit_price": 15
+      },
+      {
+        "product_id": "P002",
+        "quantity": 1,
+        "unit_price": 280
+      },
+      {
+        "product_id": "P101",
+        "quantity": 1,
+        "unit_price": 25
+      }
+    ],
+    "member_id": null,
+    "subtotal": 320.0,
+    "discount": 0.0,
+    "total": 320.0,
+    "payment_method": "cash",
+    "amount_received": 500.0,
+    "change": 180.0,
+    "created_at": "2025-08-06T14:24:29.132665",
+    "cashier": "系統管理員"
+  },
+  {
+    "id": "S20250806150921",
+    "items": [
+      {
+        "product_id": "P102",
+        "quantity": 1,
+        "unit_price": 15
+      }
+    ],
+    "member_id": null,
+    "subtotal": 15.0,
+    "discount": 0.0,
+    "total": 15.0,
+    "payment_method": "cash",
+    "amount_received": 100.0,
+    "change": 85.0,
+    "created_at": "2025-08-06T15:09:21.702525",
+    "cashier": "系統管理員"
+  },
+  {
+    "id": "S20250806150958",
+    "items": [
+      {
+        "product_id": "P002",
+        "quantity": 4,
+        "unit_price": 280
+      }
+    ],
+    "member_id": "M001",
+    "subtotal": 1120.0,
+    "discount": 0.0,
+    "total": 1120.0,
+    "payment_method": "cash",
+    "amount_received": 1500.0,
+    "change": 380.0,
+    "created_at": "2025-08-06T15:09:58.942926",
+    "cashier": "系統管理員"
+  },
+  {
+    "id": "S20250806151150",
+    "items": [
+      {
+        "product_id": "P101",
+        "quantity": 4,
+        "unit_price": 25
+      }
+    ],
+    "member_id": null,
+    "subtotal": 100.0,
+    "discount": 0.0,
+    "total": 100.0,
+    "payment_method": "cash",
+    "amount_received": 1000.0,
+    "change": 900.0,
+    "created_at": "2025-08-06T15:11:50.046670",
+    "cashier": "系統管理員"
+  },
+  {
+    "id": "S20250806151607",
+    "items": [
+      {
+        "product_id": "P102",
+        "quantity": 3,
+        "unit_price": 15
+      }
+    ],
+    "member_id": "M0002",
+    "subtotal": 45.0,
+    "discount": 0.0,
+    "total": 45.0,
+    "payment_method": "cash",
+    "amount_received": 45.0,
+    "change": 0.0,
+    "created_at": "2025-08-06T15:16:07.587659",
+    "cashier": "系統管理員"
+  },
+  {
+    "id": "S20250806151744",
+    "items": [
+      {
+        "product_id": "P102",
+        "quantity": 1,
+        "unit_price": 15
+      },
+      {
+        "product_id": "P402",
+        "quantity": 2,
+        "unit_price": 220
+      },
+      {
+        "product_id": "P401",
+        "quantity": 1,
+        "unit_price": 180
+      },
+      {
+        "product_id": "P101",
+        "quantity": 1,
+        "unit_price": 25
+      }
+    ],
+    "member_id": "M0002",
+    "subtotal": 660.0,
+    "discount": 0.0,
+    "total": 660.0,
+    "payment_method": "cash",
+    "amount_received": 660.0,
+    "change": 0.0,
+    "created_at": "2025-08-06T15:17:44.527822",
+    "cashier": "系統管理員"
+  },
+  {
+    "id": "S20250806161012",
+    "items": [
+      {
+        "product_id": "P401",
+        "quantity": 5,
+        "unit_price": 180
+      }
+    ],
+    "member_id": "M0002",
+    "subtotal": 900.0,
+    "discount": 0.0,
+    "total": 900.0,
+    "payment_method": "cash",
+    "amount_received": 1000.0,
+    "change": 100.0,
+    "manual_discount_type": null,
+    "manual_discount_value": 0.0,
+    "created_at": "2025-08-06T16:10:12.664988",
+    "cashier": "系統管理員"
+  },
+  {
+    "id": "S20250806161208",
+    "items": [
+      {
+        "product_id": "P402",
+        "quantity": 1,
+        "unit_price": 220
+      }
+    ],
+    "member_id": null,
+    "subtotal": 220.0,
+    "discount": 0.0,
+    "total": 220.0,
+    "payment_method": "line_pay",
+    "amount_received": 500.0,
+    "change": 280.0,
+    "manual_discount_type": null,
+    "manual_discount_value": 0.0,
+    "created_at": "2025-08-06T16:12:08.956724",
+    "cashier": "系統管理員"
+  },
+  {
+    "id": "S20250806170726",
+    "items": [
+      {
+        "product_id": "P402",
+        "quantity": 1,
+        "unit_price": 220
+      }
+    ],
+    "member_id": null,
+    "subtotal": 220.0,
+    "discount": 0.0,
+    "total": 220.0,
+    "payment_method": "cash",
+    "amount_received": 300.0,
+    "change": 80.0,
+    "manual_discount_type": null,
+    "manual_discount_value": 0.0,
+    "created_at": "2025-08-06T17:07:26.488118",
+    "cashier": "系統管理員"
+  },
+  {
+    "id": "S20250806170820",
+    "items": [
+      {
+        "product_id": "P102",
+        "quantity": 1,
+        "unit_price": 15
+      },
+      {
+        "product_id": "P101",
+        "quantity": 1,
+        "unit_price": 25
+      }
+    ],
+    "member_id": null,
+    "subtotal": 40.0,
+    "discount": 0.0,
+    "total": 40.0,
+    "payment_method": "cash",
+    "amount_received": 50.0,
+    "change": 10.0,
+    "manual_discount_type": null,
+    "manual_discount_value": 0.0,
+    "created_at": "2025-08-06T17:08:20.270438",
+    "cashier": "系統管理員"
+  }
+]
+
+===== data\suppliers.json =====
+[
+  {
+    "id": "S001",
+    "name": "天下文化",
+    "contact_person": "王經理",
+    "phone": "02-2517-3688",
+    "email": "service@bookzone.com.tw",
+    "address": "台北市松江路209號1樓",
+    "tax_id": "12345678",
+    "payment_terms": "月結30天",
+    "bank_account": "012-123456789012",
+    "bank_name": "台灣銀行 營業部",
+    "notes": "主要供應暢銷書籍",
+    "created_at": "2025-01-15T10:00:00+08:00",
+    "updated_at": "2025-07-24T10:00:00+08:00"
+  },
+  {
+    "id": "S002",
+    "name": "金石堂文具批發",
+    "contact_person": "林小姐",
+    "phone": "02-2369-1234",
+    "email": "stationery@kingstone.com.tw",
+    "address": "台北市中正區重慶南路一段119號",
+    "tax_id": "23456789",
+    "payment_terms": "現金7天",
+    "bank_account": "013-234567890123",
+    "bank_name": "國泰世華銀行 城中分行",
+    "notes": "文具用品批發",
+    "created_at": "2025-02-10T09:30:00+08:00",
+    "updated_at": "2025-07-24T14:30:00+08:00"
+  },
+  {
+    "id": "S003",
+    "name": "誠品精品文具",
+    "contact_person": "陳經理",
+    "phone": "02-6639-6888",
+    "email": "eslite@eslite.com",
+    "address": "台北市信義區菸廠路88號",
+    "tax_id": "34567890",
+    "payment_terms": "月結15天",
+    "bank_account": "012-345678901234",
+    "bank_name": "中國信託 信義分行",
+    "notes": "高級文具與禮品",
+    "created_at": "2025-03-05T14:20:00+08:00",
+    "updated_at": "2025-07-23T09:15:00+08:00"
+  },
+  {
+    "id": "S004",
+    "name": "IKEA 商業採購",
+    "contact_person": "張專員",
+    "phone": "02-412-8869",
+    "email": "business@ikea.com.tw",
+    "address": "新北市新莊區中正路1號",
+    "tax_id": "45678901",
+    "payment_terms": "月結30天",
+    "bank_account": "007-456789012345",
+    "bank_name": "花旗銀行 台北分行",
+    "notes": "傢俱與收納解決方案",
+    "created_at": "2025-04-12T11:15:00+08:00",
+    "updated_at": "2025-07-22T16:45:00+08:00"
+  },
+  {
+    "id": "S005",
+    "name": "博客來經銷中心",
+    "contact_person": "黃經理",
+    "phone": "02-2653-5588",
+    "email": "b2b@books.com.tw",
+    "address": "台北市大安區光復南路102號3樓",
+    "tax_id": "56789012",
+    "payment_terms": "月結30天",
+    "bank_account": "008-567890123456",
+    "bank_name": "玉山銀行 敦南分行",
+    "notes": "各類書籍批發",
+    "created_at": "2025-05-20T13:45:00+08:00",
+    "updated_at": "2025-07-22T10:30:00+08:00"
+  },
+  {
+    "name": "新增",
+    "contact_person": "新增人",
+    "phone": "0909090990",
+    "email": "service@123",
+    "address": "",
+    "payment_terms": "月結30天",
+    "notes": "",
+    "id": "S006",
+    "created_at": "2025-07-31T13:33:10.751223"
+  }
+]
+
+===== docs\base.html =====
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>書房管理系統 - 書房記帳與營運管理系統</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="./static/css/styles.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+    <!-- 導航欄 -->
+    <nav class="bg-blue-600 text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="./index.html" class="text-xl font-bold">📚 書房管理系統</a>
+                </div>
+                <div class="hidden md:flex items-center space-x-4">
+                    <a href="./index.html" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
+                        <i class="fas fa-tachometer-alt mr-1"></i> 儀表板
+                    </a>
+                    <a href="./products.html" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
+                        <i class="fas fa-box mr-1"></i> 商品管理
+                    </a>
+                    <a href="./purchases.html" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
+                        <i class="fas fa-shopping-cart mr-1"></i> 進貨管理
+                    </a>
+                    <a href="./sales.html" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
+                        <i class="fas fa-cash-register mr-1"></i> 銷售管理
+                    </a>
+                    <a href="./members.html" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
+                        <i class="fas fa-users mr-1"></i> 會員管理
+                    </a>
+                    <a href="./suppliers.html" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
+                        <i class="fas fa-truck mr-1"></i> 供應商管理
+                    </a>
+                    <a href="./reports.html" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
+                        <i class="fas fa-chart-bar mr-1"></i> 報表分析
+                    </a>
+                </div>
+                <div class="md:hidden flex items-center">
+                    <button id="mobile-menu-button" class="text-white focus:outline-none">
+                        <i class="fas fa-bars text-2xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- 移動端菜單 -->
+        <div id="mobile-menu" class="md:hidden hidden pb-4 px-4">
+            <a href="./index.html" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700">
+                <i class="fas fa-tachometer-alt mr-2"></i> 儀表板
+            </a>
+            <a href="./products.html" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700">
+                <i class="fas fa-box mr-2"></i> 商品管理
+            </a>
+            <a href="./purchases.html" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700">
+                <i class="fas fa-shopping-cart mr-2"></i> 進貨管理
+            </a>
+            <a href="./sales.html" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700">
+                <i class="fas fa-cash-register mr-2"></i> 銷售管理
+            </a>
+            <a href="./members.html" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700">
+                <i class="fas fa-users mr-2"></i> 會員管理
+            </a>
+            <a href="./suppliers.html" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700">
+                <i class="fas fa-truck mr-2"></i> 供應商管理
+            </a>
+            <a href="./reports.html" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700">
+                <i class="fas fa-chart-bar mr-2"></i> 報表分析
+            </a>
+        </div>
+    </nav>
+
+    <!-- 主要內容 -->
+    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        
+    </main>
+
+    <!-- 頁腳 -->
+    <footer class="bg-white mt-12">
+        <div class="max-w-7xl mx-auto py-6 px-4 overflow-hidden sm:px-6 lg:px-8">
+            <p class="text-center text-gray-500 text-sm">
+                &copy; 2025 書房記帳與營運管理系統. All rights reserved.
+            </p>
+        </div>
+    </footer>
+
+    <!-- 全局組件 -->
+    <!-- 加載指示器 -->
+<div id="loading" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg p-6 shadow-xl">
+        <div class="flex items-center">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span class="ml-3 text-gray-700">載入中，請稍候...</span>
+        </div>
+    </div>
+</div>
+    <!-- 通知訊息 -->
+<div id="notifications" class="fixed top-4 right-4 z-50 space-y-2 w-80">
+    <!-- 成功通知 -->
+    <div id="success-notification" class="notification hidden bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+        <div class="flex items-center">
+            <i class="fas fa-check-circle mr-2"></i>
+            <span class="notification-message">操作成功！</span>
+        </div>
+        <button class="absolute top-0 bottom-0 right-0 px-4 py-3 close-notification">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    
+    <!-- 錯誤通知 -->
+    <div id="error-notification" class="notification hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+        <div class="flex items-center">
+            <i class="fas fa-exclamation-circle mr-2"></i>
+            <span class="notification-message">發生錯誤！</span>
+        </div>
+        <button class="absolute top-0 bottom-0 right-0 px-4 py-3 close-notification">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    
+    <!-- 警告通知 -->
+    <div id="warning-notification" class="notification hidden bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative" role="alert">
+        <div class="flex items-center">
+            <i class="fas fa-exclamation-triangle mr-2"></i>
+            <span class="notification-message">警告訊息</span>
+        </div>
+        <button class="absolute top-0 bottom-0 right-0 px-4 py-3 close-notification">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+</div>
+    <!-- 確認對話框 -->
+<div id="confirm-dialog" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg shadow-xl w-96">
+        <!-- Header -->
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-medium text-gray-900" id="confirm-title">確認操作</h3>
+        </div>
+        
+        <!-- Body -->
+        <div class="px-6 py-4">
+            <p class="text-gray-600" id="confirm-message">您確定要執行此操作嗎？此操作無法復原。</p>
+        </div>
+        
+        <!-- Footer -->
+        <div class="px-6 py-4 bg-gray-50 text-right rounded-b-lg">
+            <button type="button" id="confirm-cancel" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                取消
+            </button>
+            <button type="button" id="confirm-ok" class="ml-3 inline-flex justify-center px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                確認
+            </button>
+        </div>
+    </div>
+</div>
+
+    <!-- JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="./static/js/ui.js"></script>      
+    <script src="./static/js/main.js"></script>    
+</body>
+</html>

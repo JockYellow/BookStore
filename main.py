@@ -4,6 +4,7 @@ try:
     from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
     from fastapi.templating import Jinja2Templates
     from fastapi.middleware.cors import CORSMiddleware
+    from tempfile import NamedTemporaryFile
     HAS_FASTAPI = True
 except ModuleNotFoundError:  # pragma: no cover - fallback for test envs
     HAS_FASTAPI = False
@@ -220,6 +221,25 @@ async def reports_page(request: Request):
         "request": request,
         "title": "報表分析"
     })
+@app.get("/api/reports/overview")
+async def get_report_overview(start_date: str = None, end_date: str = None):
+    service = ReportService(str(DATA_DIR))
+    report = service.get_sales_report(start_date, end_date)
+    return report
+
+@app.get("/api/reports/export")
+async def export_top_products_excel(start_date: str = None, end_date: str = None):
+    service = ReportService(str(DATA_DIR))
+    report = service.get_sales_report(start_date, end_date)
+    top_products = report.get('top_products', [])
+
+    with NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
+        service.export_to_excel(top_products, tmp.name)
+        return FileResponse(
+            tmp.name,
+            filename="top_products.xlsx",
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
 # 商品相關 API
 @app.get("/api/products")

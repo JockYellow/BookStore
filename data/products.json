@@ -4,13 +4,14 @@
     "name": "原子習慣",
     "category": "書籍",
     "purchase_price": 280,
-    "sale_price": 350,
+    "sale_price": 500,
     "stock": 50,
     "supplier_id": "S001",
     "min_stock": 5,
     "unit": "本",
     "created_at": "2025-07-01T10:00:00+08:00",
-    "updated_at": "2025-07-24T18:18:48.916415"
+    "updated_at": "2025-08-06T14:22:49.245120",
+    "description": ""
   },
   {
     "id": "P002",
@@ -18,12 +19,12 @@
     "category": "心理勵志",
     "purchase_price": 220,
     "sale_price": 280,
-    "stock": 25,
+    "stock": 20,
     "supplier_id": "S001",
     "min_stock": 5,
     "unit": "本",
     "created_at": "2025-07-01T10:00:00+08:00",
-    "updated_at": "2025-07-24T10:00:00+08:00"
+    "updated_at": "2025-08-06T15:09:58.942926"
   },
   {
     "id": "P101",
@@ -31,12 +32,12 @@
     "category": "文具",
     "purchase_price": 15,
     "sale_price": 25,
-    "stock": 100,
+    "stock": 93,
     "supplier_id": "S002",
     "min_stock": 20,
     "unit": "本",
     "created_at": "2025-07-15T09:30:00+08:00",
-    "updated_at": "2025-07-24T14:30:00+08:00"
+    "updated_at": "2025-08-06T17:08:20.270438"
   },
   {
     "id": "P102",
@@ -44,12 +45,12 @@
     "category": "文具",
     "purchase_price": 8,
     "sale_price": 15,
-    "stock": 200,
+    "stock": 193,
     "supplier_id": "S002",
     "min_stock": 50,
     "unit": "支",
     "created_at": "2025-07-15T09:30:00+08:00",
-    "updated_at": "2025-07-24T14:30:00+08:00"
+    "updated_at": "2025-08-06T17:08:20.270438"
   },
   {
     "id": "P201",
@@ -83,12 +84,12 @@
     "category": "小說",
     "purchase_price": 140,
     "sale_price": 180,
-    "stock": 50,
+    "stock": 44,
     "supplier_id": "S005",
     "min_stock": 10,
     "unit": "本",
     "created_at": "2025-07-15T10:00:00+08:00",
-    "updated_at": "2025-07-22T10:30:00+08:00"
+    "updated_at": "2025-08-06T16:10:12.664988"
   },
   {
     "id": "P402",
@@ -96,12 +97,12 @@
     "category": "商業",
     "purchase_price": 180,
     "sale_price": 220,
-    "stock": 30,
+    "stock": 26,
     "supplier_id": "S005",
     "min_stock": 10,
     "unit": "本",
     "created_at": "2025-07-15T10:00:00+08:00",
-    "updated_at": "2025-07-22T10:30:00+08:00"
+    "updated_at": "2025-08-06T17:07:26.488118"
   },
   {
     "id": "P403",

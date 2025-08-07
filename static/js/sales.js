@@ -1,4 +1,4 @@
-// static/js/sales.js (修改後，支援會員折扣與找零)
+// static/js/sales.js (修正後，支援會員折扣與找零)
 
 document.addEventListener('DOMContentLoaded', function() {
     // DOM 元素
@@ -34,6 +34,49 @@ document.addEventListener('DOMContentLoaded', function() {
     let cart = []; // 購物車結構: [{ id, name, price, quantity }, ...]
     let members = [];
     let selectedMember = null;
+
+    // [修正] 將 calculateChange 和 updateCheckoutSummary 移至頂層，使其成為可重用的輔助函式
+
+    /**
+     * 計算找零金額
+     */
+    const calculateChange = () => {
+        const totalText = document.getElementById('checkout-total')?.textContent || '0';
+        const total = parseFloat(totalText.replace(/[$,]/g, '')) || 0;
+        const received = parseFloat(amountReceivedInput.value);
+        if (!isNaN(received) && received >= total) {
+            const changeVal = received - total;
+            changeDisplay.value = changeVal.toLocaleString();
+        } else {
+            changeDisplay.value = '0';
+        }
+    };
+
+    /**
+     * 更新結帳彈出視窗內的摘要資訊
+     */
+    const updateCheckoutSummary = () => {
+        const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+        let discount = 0;
+        if (selectedMember && selectedMember.discount_rate) {
+            discount = subtotal * selectedMember.discount_rate;
+        }
+        let manual = 0;
+        const dt = discountType ? discountType.value : '';
+        const dv = discountValue ? parseFloat(discountValue.value) || 0 : 0;
+        if (dt === 'percentage') manual = subtotal * (dv / 100);
+        else if (dt === 'amount') manual = dv;
+        
+        const total = subtotal - discount - manual;
+
+        document.getElementById('checkout-subtotal').textContent = `$${subtotal.toLocaleString()}`;
+        memberDiscountDisplay.textContent = `-$${discount.toLocaleString()}`;
+        manualDiscountDisplay.textContent = `-$${manual.toLocaleString()}`;
+        document.getElementById('checkout-total').textContent = `$${total.toLocaleString()}`;
+        
+        calculateChange(); // 每次更新摘要時都重新計算找零
+    };
+
 
     // 初始化
     const init = async () => {
@@ -117,7 +160,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="text-sm text-gray-500">$${p.sale_price}</div>
                 <div class="text-xs text-gray-400">庫存: ${p.stock}</div>
             </div>
-        `).join('');
+         `).join('');
     };
 
     // 新增至購物車
@@ -150,12 +193,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="cart-item flex justify-between items-center" data-id="${item.id}">
                     <div>
                         <div>${item.name}</div>
-                        <div class="text-sm text-gray-400">$${item.price} x ${item.quantity}</div>
+                         <div class="text-sm text-gray-400">$${item.price} x ${item.quantity}</div>
                     </div>
                     <div class="font-medium">$${(item.price * item.quantity).toLocaleString()}</div>
                     <button class="remove-item text-red-500">x</button>
                 </div>
-            `).join('');
+             `).join('');
         }
 
         const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
@@ -178,10 +221,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 memberInfo.innerHTML = `
                     <div class="flex items-center">
                         <div class="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                            <i class="fas fa-user text-blue-500"></i>
+                             <i class="fas fa-user text-blue-500"></i>
                         </div>
                         <div class="ml-3">
-                            <p class="text-sm font-medium text-gray-900">${selectedMember.name || selectedMember.id}</p>
+                             <p class="text-sm font-medium text-gray-900">${selectedMember.name || selectedMember.id}</p>
                             <p class="text-xs text-gray-500">${selectedMember.phone || ''}</p>
                         </div>
                     </div>`;
@@ -189,11 +232,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 memberInfo.innerHTML = `
                     <div class="flex items-center">
                         <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
-                            <i class="fas fa-user text-gray-400"></i>
+                           <i class="fas fa-user text-gray-400"></i>
                         </div>
                         <div class="ml-3">
                             <p class="text-sm font-medium text-gray-900">非會員顧客</p>
-                            <p class="text-xs text-gray-500">無會員折扣</p>
+                             <p class="text-xs text-gray-500">無會員折扣</p>
                         </div>
                     </div>`;
             }
@@ -234,7 +277,6 @@ document.addEventListener('DOMContentLoaded', function() {
             manualDiscount = discVal;
         }
         const total = subtotal - memberDiscount - manualDiscount;
-
         const received = amountReceivedInput && amountReceivedInput.value ? parseFloat(amountReceivedInput.value) : total;
         const change = received - total;
 
@@ -261,7 +303,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(saleData)
             });
-
             if (!response.ok) {
                 const err = await response.json();
                 throw new Error(err.detail || '結帳失敗');
@@ -275,7 +316,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (discountType) discountType.value = '';
             if (discountValue) discountValue.value = 0;
             updateCartUI();
-            checkoutModal.classList.add('hidden'); // 關閉結帳視窗
+            checkoutModal.classList.add('hidden');
+            // 關閉結帳視窗
             document.body.classList.remove('overflow-hidden');
         } catch (error) {
             console.error('結帳失敗:', error);
@@ -391,7 +433,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     <td>$${(item.price * item.quantity).toLocaleString()}</td>
                 </tr>
             `).join('');
-            updateCheckoutSummary();
+            // ←—— 新增：預設實收金額為總計，並立即算一次找零
+            amountReceivedInput.value = (subtotal - discount).toFixed(2);
+            calculateChange();
+
+            updateCheckoutSummary(); // Initial calculation
             checkoutModal.classList.remove('hidden');
             document.body.classList.add('overflow-hidden');
         });
@@ -404,38 +450,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.body.classList.remove('overflow-hidden');
             });
         });
-
-        const calculateChange = () => {
-            const totalText = document.getElementById('checkout-total')?.textContent || '0';
-            const total = parseFloat(totalText.replace(/[$,]/g, '')) || 0;
-            const received = parseFloat(amountReceivedInput.value);
-            if (!isNaN(received) && received >= total) {
-                const changeVal = received - total;
-                changeDisplay.value = changeVal.toLocaleString();
-            } else {
-                changeDisplay.value = '0';
-            }
-        };
-
-        const updateCheckoutSummary = () => {
-            const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
-            let discount = 0;
-            if (selectedMember && selectedMember.discount_rate) {
-                discount = subtotal * selectedMember.discount_rate;
-            }
-            let manual = 0;
-            const dt = discountType ? discountType.value : '';
-            const dv = discountValue ? parseFloat(discountValue.value) || 0 : 0;
-            if (dt === 'percentage') manual = subtotal * (dv / 100);
-            else if (dt === 'amount') manual = dv;
-            const total = subtotal - discount - manual;
-            document.getElementById('checkout-subtotal').textContent = `$${subtotal.toLocaleString()}`;
-            memberDiscountDisplay.textContent = `-$${discount.toLocaleString()}`;
-            manualDiscountDisplay.textContent = `-$${manual.toLocaleString()}`;
-            document.getElementById('checkout-total').textContent = `$${total.toLocaleString()}`;
-            calculateChange();
-        };
-
+        
+        // 折扣輸入會觸發重新計算
         if (discountType) {
             discountType.addEventListener('change', updateCheckoutSummary);
         }
@@ -443,7 +459,7 @@ document.addEventListener('DOMContentLoaded', function() {
             discountValue.addEventListener('input', updateCheckoutSummary);
         }
 
-        // 計算找零
+        // 計算找零的事件監聽
         if (calcChangeBtn && amountReceivedInput && changeDisplay) {
             calcChangeBtn.addEventListener('click', calculateChange);
             amountReceivedInput.addEventListener('input', calculateChange);

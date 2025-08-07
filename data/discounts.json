@@ -1,1 +1,12 @@
-[]
+[
+  {
+    "id": "D001",
+    "name": "全館 10% off",
+    "target_type": "all",
+    "target_id": null,
+    "discount_type": "percentage",
+    "value": 10,
+    "valid_from": "2025-08-01T00:00:00",
+    "valid_to": "2025-08-31T23:59:59"
+  }
+]
